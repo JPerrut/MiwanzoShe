@@ -30,7 +30,7 @@ class DashboardScreen extends StatelessWidget {
         final items = state.latestPreferenceItems;
 
         return ListView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
           children: [
             Text('Miwanzo', style: textTheme.headlineMedium),
             const SizedBox(height: 8),
@@ -66,6 +66,11 @@ class DashboardScreen extends StatelessWidget {
                         label: 'Gostos',
                         icon: Icons.favorite,
                         onTap: () => onOpenSection(3),
+                      ),
+                      _QuickAction(
+                        label: 'Logs',
+                        icon: Icons.receipt_long,
+                        onTap: () => onOpenSection(4),
                       ),
                       _QuickAction(
                         label: 'Resumo',

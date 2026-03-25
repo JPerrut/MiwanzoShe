@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../logging/app_logger.dart';
 import '../../models/category_entry.dart';
 import '../../models/preference_item.dart';
 import '../../state/miwanzo_state.dart';
@@ -10,6 +11,7 @@ class PreferencesScreen extends StatelessWidget {
   const PreferencesScreen({required this.state, super.key});
 
   final MiwanzoState state;
+  static final AppLogger _logger = AppLogger.instance;
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +21,7 @@ class PreferencesScreen extends StatelessWidget {
         final categories = state.categories;
 
         return ListView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
           children: [
             SectionTitle(
               title: 'Gostos e Não Gostos',
@@ -95,20 +97,23 @@ class PreferencesScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _confirmDelete(BuildContext context, PreferenceItem item) async {
+  Future<void> _confirmDelete(
+    BuildContext pageContext,
+    PreferenceItem item,
+  ) async {
     final shouldDelete = await showDialog<bool>(
-      context: context,
-      builder: (context) {
+      context: pageContext,
+      builder: (dialogContext) {
         return AlertDialog(
           title: const Text('Excluir item?'),
           content: Text('Deseja excluir "${item.name}"?'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context, false),
+              onPressed: () => Navigator.pop(dialogContext, false),
               child: const Text('Cancelar'),
             ),
             FilledButton(
-              onPressed: () => Navigator.pop(context, true),
+              onPressed: () => Navigator.pop(dialogContext, true),
               child: const Text('Excluir'),
             ),
           ],
@@ -122,7 +127,7 @@ class PreferencesScreen extends StatelessWidget {
   }
 
   Future<void> _openItemForm(
-    BuildContext context, {
+    BuildContext pageContext, {
     PreferenceItem? existing,
   }) async {
     final formKey = GlobalKey<FormState>();
@@ -144,16 +149,17 @@ class PreferencesScreen extends StatelessWidget {
           );
 
     var status = existing?.status ?? PreferenceStatus.likes;
+    var isSaving = false;
 
     await showModalBottomSheet<void>(
-      context: context,
+      context: pageContext,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (context) {
+      builder: (sheetContext) {
         return StatefulBuilder(
-          builder: (context, setModalState) {
-            final bottom = MediaQuery.viewInsetsOf(context).bottom;
+          builder: (sheetContext, setModalState) {
+            final bottom = MediaQuery.viewInsetsOf(sheetContext).bottom;
 
             return Padding(
               padding: EdgeInsets.fromLTRB(16, 12, 16, bottom + 18),
@@ -166,7 +172,7 @@ class PreferencesScreen extends StatelessWidget {
                       children: [
                         Text(
                           existing == null ? 'Novo Item' : 'Editar Item',
-                          style: Theme.of(context).textTheme.titleLarge,
+                          style: Theme.of(sheetContext).textTheme.titleLarge,
                         ),
                         const SizedBox(height: 14),
                         DropdownButtonFormField<int>(
@@ -182,17 +188,22 @@ class PreferencesScreen extends StatelessWidget {
                                 ),
                               )
                               .toList(growable: false),
-                          onChanged: (value) {
-                            if (value == null) return;
-                            final category = categories.firstWhere(
-                              (current) => current.id == value,
-                            );
-                            setModalState(() => selectedCategory = category);
-                          },
+                          onChanged: isSaving
+                              ? null
+                              : (value) {
+                                  if (value == null) return;
+                                  final category = categories.firstWhere(
+                                    (current) => current.id == value,
+                                  );
+                                  setModalState(
+                                    () => selectedCategory = category,
+                                  );
+                                },
                         ),
                         const SizedBox(height: 10),
                         TextFormField(
                           controller: nameController,
+                          enabled: !isSaving,
                           decoration: const InputDecoration(
                             labelText: 'Item',
                             hintText: 'Ex: KitKat Dark',
@@ -207,7 +218,7 @@ class PreferencesScreen extends StatelessWidget {
                         const SizedBox(height: 10),
                         Text(
                           'Status',
-                          style: Theme.of(context).textTheme.titleMedium,
+                          style: Theme.of(sheetContext).textTheme.titleMedium,
                         ),
                         const SizedBox(height: 8),
                         SegmentedButton<PreferenceStatus>(
@@ -224,13 +235,16 @@ class PreferencesScreen extends StatelessWidget {
                             ),
                           ],
                           selected: {status},
-                          onSelectionChanged: (values) {
-                            setModalState(() => status = values.first);
-                          },
+                          onSelectionChanged: isSaving
+                              ? null
+                              : (values) {
+                                  setModalState(() => status = values.first);
+                                },
                         ),
                         const SizedBox(height: 10),
                         TextFormField(
                           controller: observationController,
+                          enabled: !isSaving,
                           maxLines: 3,
                           decoration: const InputDecoration(
                             labelText: 'Observação',
@@ -242,48 +256,93 @@ class PreferencesScreen extends StatelessWidget {
                           children: [
                             Expanded(
                               child: TextButton(
-                                onPressed: () => Navigator.pop(context),
+                                onPressed: isSaving
+                                    ? null
+                                    : () => Navigator.of(sheetContext).pop(),
                                 child: const Text('Cancelar'),
                               ),
                             ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: FilledButton(
-                                onPressed: () async {
-                                  if (!(formKey.currentState?.validate() ??
-                                      false)) {
-                                    return;
-                                  }
+                                onPressed: isSaving
+                                    ? null
+                                    : () async {
+                                        if (!(formKey.currentState
+                                                ?.validate() ??
+                                            false)) {
+                                          return;
+                                        }
 
-                                  if (existing == null) {
-                                    await state.addPreferenceItem(
-                                      categoryId: selectedCategory.id,
-                                      category: selectedCategory.name,
-                                      name: nameController.text.trim(),
-                                      status: status,
-                                      observation: observationController.text
-                                          .trim(),
-                                    );
-                                  } else {
-                                    await state.updatePreferenceItem(
-                                      existing.copyWith(
-                                        categoryId: selectedCategory.id,
-                                        category: selectedCategory.name,
-                                        name: nameController.text.trim(),
-                                        status: status,
-                                        observation: observationController.text
-                                            .trim(),
+                                        setModalState(() => isSaving = true);
+
+                                        try {
+                                          if (existing == null) {
+                                            await state.addPreferenceItem(
+                                              categoryId: selectedCategory.id,
+                                              category: selectedCategory.name,
+                                              name: nameController.text.trim(),
+                                              status: status,
+                                              observation: observationController
+                                                  .text
+                                                  .trim(),
+                                            );
+                                          } else {
+                                            await state.updatePreferenceItem(
+                                              existing.copyWith(
+                                                categoryId: selectedCategory.id,
+                                                category: selectedCategory.name,
+                                                name: nameController.text
+                                                    .trim(),
+                                                status: status,
+                                                observation:
+                                                    observationController.text
+                                                        .trim(),
+                                              ),
+                                            );
+                                          }
+
+                                          if (sheetContext.mounted) {
+                                            Navigator.of(sheetContext).pop();
+                                            return;
+                                          }
+                                        } catch (error, stackTrace) {
+                                          _logger.error(
+                                            'PreferencesScreen',
+                                            'Falha ao salvar item de preferência via formulário.',
+                                            error: error,
+                                            stackTrace: stackTrace,
+                                          );
+                                          if (pageContext.mounted) {
+                                            ScaffoldMessenger.of(
+                                              pageContext,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Não foi possível salvar o item agora. Tente novamente.',
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        }
+
+                                        if (sheetContext.mounted) {
+                                          setModalState(() => isSaving = false);
+                                        }
+                                      },
+                                child: isSaving
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : Text(
+                                        existing == null
+                                            ? 'Salvar'
+                                            : 'Atualizar',
                                       ),
-                                    );
-                                  }
-
-                                  if (context.mounted) {
-                                    Navigator.pop(context);
-                                  }
-                                },
-                                child: Text(
-                                  existing == null ? 'Salvar' : 'Atualizar',
-                                ),
                               ),
                             ),
                           ],
@@ -299,6 +358,7 @@ class PreferencesScreen extends StatelessWidget {
       },
     );
 
+    await Future<void>.delayed(const Duration(milliseconds: 300));
     nameController.dispose();
     observationController.dispose();
   }

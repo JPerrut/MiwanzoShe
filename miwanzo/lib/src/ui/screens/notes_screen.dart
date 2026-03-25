@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../logging/app_logger.dart';
 import '../../models/note_entry.dart';
 import '../../state/miwanzo_state.dart';
 import '../../utils/date_formatters.dart';
@@ -10,6 +11,7 @@ class NotesScreen extends StatelessWidget {
   const NotesScreen({required this.state, super.key});
 
   final MiwanzoState state;
+  static final AppLogger _logger = AppLogger.instance;
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +21,7 @@ class NotesScreen extends StatelessWidget {
         final notes = state.notes;
 
         return ListView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
           children: [
             SectionTitle(
               title: 'Anotações',
@@ -50,20 +52,20 @@ class NotesScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _confirmDelete(BuildContext context, NoteEntry note) async {
+  Future<void> _confirmDelete(BuildContext pageContext, NoteEntry note) async {
     final shouldDelete = await showDialog<bool>(
-      context: context,
-      builder: (context) {
+      context: pageContext,
+      builder: (dialogContext) {
         return AlertDialog(
           title: const Text('Excluir nota?'),
           content: Text('Deseja realmente excluir "${note.title}"?'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context, false),
+              onPressed: () => Navigator.pop(dialogContext, false),
               child: const Text('Cancelar'),
             ),
             FilledButton(
-              onPressed: () => Navigator.pop(context, true),
+              onPressed: () => Navigator.pop(dialogContext, true),
               child: const Text('Excluir'),
             ),
           ],
@@ -77,7 +79,7 @@ class NotesScreen extends StatelessWidget {
   }
 
   Future<void> _openNoteForm(
-    BuildContext context, {
+    BuildContext pageContext, {
     NoteEntry? existing,
   }) async {
     final titleController = TextEditingController(text: existing?.title ?? '');
@@ -86,126 +88,181 @@ class NotesScreen extends StatelessWidget {
     );
     final tagController = TextEditingController(text: existing?.tag ?? '');
     final formKey = GlobalKey<FormState>();
+    var isSaving = false;
 
     await showModalBottomSheet<void>(
-      context: context,
+      context: pageContext,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (context) {
-        final bottom = MediaQuery.viewInsetsOf(context).bottom;
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (sheetContext, setModalState) {
+            final bottom = MediaQuery.viewInsetsOf(sheetContext).bottom;
 
-        return Padding(
-          padding: EdgeInsets.fromLTRB(16, 12, 16, bottom + 18),
-          child: GlassPanel(
-            child: Form(
-              key: formKey,
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      existing == null ? 'Nova Nota' : 'Editar Nota',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 14),
-                    TextFormField(
-                      controller: titleController,
-                      decoration: const InputDecoration(
-                        labelText: 'Título',
-                        hintText: 'Ex: Ideias para presente',
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Informe o título da nota';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 10),
-                    TextFormField(
-                      controller: descriptionController,
-                      maxLines: 4,
-                      decoration: const InputDecoration(
-                        labelText: 'Descrição',
-                        hintText: 'Escreva os detalhes importantes...',
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Informe a descrição';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 10),
-                    TextFormField(
-                      controller: tagController,
-                      decoration: const InputDecoration(
-                        labelText: 'Tag',
-                        hintText: 'Ex: tpm, presente, encontro',
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    Row(
+            return Padding(
+              padding: EdgeInsets.fromLTRB(16, 12, 16, bottom + 18),
+              child: GlassPanel(
+                child: Form(
+                  key: formKey,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Cancelar'),
+                        Text(
+                          existing == null ? 'Nova Nota' : 'Editar Nota',
+                          style: Theme.of(sheetContext).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 14),
+                        TextFormField(
+                          controller: titleController,
+                          enabled: !isSaving,
+                          decoration: const InputDecoration(
+                            labelText: 'Título',
+                            hintText: 'Ex: Ideias para presente',
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Informe o título da nota';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 10),
+                        TextFormField(
+                          controller: descriptionController,
+                          enabled: !isSaving,
+                          maxLines: 4,
+                          decoration: const InputDecoration(
+                            labelText: 'Descrição',
+                            hintText: 'Escreva os detalhes importantes...',
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Informe a descrição';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 10),
+                        TextFormField(
+                          controller: tagController,
+                          enabled: !isSaving,
+                          decoration: const InputDecoration(
+                            labelText: 'Tag',
+                            hintText: 'Ex: tpm, presente, encontro',
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: FilledButton(
-                            onPressed: () async {
-                              if (!(formKey.currentState?.validate() ??
-                                  false)) {
-                                return;
-                              }
-
-                              final normalizedTag =
-                                  tagController.text.trim().isEmpty
-                                  ? 'sem_tag'
-                                  : tagController.text.trim();
-
-                              if (existing == null) {
-                                await state.addNote(
-                                  title: titleController.text.trim(),
-                                  description: descriptionController.text
-                                      .trim(),
-                                  tag: normalizedTag,
-                                );
-                              } else {
-                                await state.updateNote(
-                                  existing.copyWith(
-                                    title: titleController.text.trim(),
-                                    description: descriptionController.text
-                                        .trim(),
-                                    tag: normalizedTag,
-                                  ),
-                                );
-                              }
-
-                              if (context.mounted) {
-                                Navigator.pop(context);
-                              }
-                            },
-                            child: Text(
-                              existing == null ? 'Salvar' : 'Atualizar',
+                        const SizedBox(height: 18),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextButton(
+                                onPressed: isSaving
+                                    ? null
+                                    : () => Navigator.of(sheetContext).pop(),
+                                child: const Text('Cancelar'),
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: FilledButton(
+                                onPressed: isSaving
+                                    ? null
+                                    : () async {
+                                        if (!(formKey.currentState
+                                                ?.validate() ??
+                                            false)) {
+                                          return;
+                                        }
+
+                                        final normalizedTag =
+                                            tagController.text.trim().isEmpty
+                                            ? 'sem_tag'
+                                            : tagController.text.trim();
+
+                                        setModalState(() => isSaving = true);
+
+                                        try {
+                                          if (existing == null) {
+                                            await state.addNote(
+                                              title: titleController.text
+                                                  .trim(),
+                                              description: descriptionController
+                                                  .text
+                                                  .trim(),
+                                              tag: normalizedTag,
+                                            );
+                                          } else {
+                                            await state.updateNote(
+                                              existing.copyWith(
+                                                title: titleController.text
+                                                    .trim(),
+                                                description:
+                                                    descriptionController.text
+                                                        .trim(),
+                                                tag: normalizedTag,
+                                              ),
+                                            );
+                                          }
+
+                                          if (sheetContext.mounted) {
+                                            Navigator.of(sheetContext).pop();
+                                            return;
+                                          }
+                                        } catch (error, stackTrace) {
+                                          _logger.error(
+                                            'NotesScreen',
+                                            'Falha ao salvar nota via formulário.',
+                                            error: error,
+                                            stackTrace: stackTrace,
+                                          );
+                                          if (pageContext.mounted) {
+                                            ScaffoldMessenger.of(
+                                              pageContext,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Não foi possível salvar a nota agora. Tente novamente.',
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        }
+
+                                        if (sheetContext.mounted) {
+                                          setModalState(() => isSaving = false);
+                                        }
+                                      },
+                                child: isSaving
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : Text(
+                                        existing == null
+                                            ? 'Salvar'
+                                            : 'Atualizar',
+                                      ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ),
+            );
+          },
         );
       },
     );
 
+    await Future<void>.delayed(const Duration(milliseconds: 300));
     titleController.dispose();
     descriptionController.dispose();
     tagController.dispose();

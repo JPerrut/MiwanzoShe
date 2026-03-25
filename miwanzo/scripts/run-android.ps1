@@ -38,6 +38,9 @@ $emulatorDir = Join-Path $sdkRoot 'emulator'
 if (Test-Path $platformTools) { Ensure-PathContains $platformTools }
 if (Test-Path $emulatorDir) { Ensure-PathContains $emulatorDir }
 
+$avdName = 'Miwanzo_Lite_API_35'
+$emulatorExe = Join-Path $emulatorDir 'emulator.exe'
+
 Write-Host '==> flutter pub get'
 & $flutterCmd pub get
 
@@ -45,9 +48,19 @@ $deviceList = & adb devices
 $runningEmulatorMatch = $deviceList | Select-String -Pattern '^emulator-[0-9]+\s+device$' | Select-Object -First 1
 
 if (-not $runningEmulatorMatch) {
-  $avdName = 'Miwanzo_API_35'
   Write-Host "==> Iniciando emulador: $avdName"
-  & $flutterCmd emulators --launch $avdName
+  if (-not (Test-Path $emulatorExe)) {
+    throw "Emulator não encontrado em $emulatorExe"
+  }
+
+  Start-Process -FilePath $emulatorExe -ArgumentList @(
+    '-avd', $avdName,
+    '-gpu', 'angle_indirect',
+    '-no-snapshot-load',
+    '-no-snapshot-save',
+    '-no-boot-anim',
+    '-memory', '1536'
+  )
 
   $maxAttempts = 120
   for ($i = 0; $i -lt $maxAttempts; $i++) {

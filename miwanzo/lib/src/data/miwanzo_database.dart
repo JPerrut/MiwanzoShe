@@ -7,6 +7,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../models/category_entry.dart';
 import '../models/important_date.dart';
+import '../models/media_entry.dart';
 import '../models/note_entry.dart';
 import '../models/preference_item.dart';
 
@@ -16,7 +17,7 @@ class MiwanzoDatabase {
   static final MiwanzoDatabase instance = MiwanzoDatabase._();
 
   static const String _databaseName = 'miwanzo.db';
-  static const int _databaseVersion = 1;
+  static const int _databaseVersion = 3;
 
   static const List<String> _defaultCategories = [
     'Comidas',
@@ -58,6 +59,7 @@ class MiwanzoDatabase {
         options: OpenDatabaseOptions(
           version: _databaseVersion,
           onCreate: _onCreate,
+          onUpgrade: _onUpgrade,
           onOpen: _onOpen,
         ),
       );
@@ -67,6 +69,7 @@ class MiwanzoDatabase {
       databasePath,
       version: _databaseVersion,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
       onOpen: _onOpen,
     );
   }
@@ -126,7 +129,50 @@ class MiwanzoDatabase {
       )
     ''');
 
+    await db.execute('''
+      CREATE UNIQUE INDEX idx_datas_importantes_unique_titulo_data
+      ON datas_importantes(titulo, data)
+    ''');
+
+    await db.execute('''
+      CREATE TABLE arquivos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        caminho TEXT NOT NULL,
+        tipo TEXT NOT NULL,
+        data_criacao TEXT NOT NULL
+      )
+    ''');
+
     await _seedDefaultCategories(db);
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('''
+        DELETE FROM datas_importantes
+        WHERE id NOT IN (
+          SELECT MIN(id)
+          FROM datas_importantes
+          GROUP BY titulo, data
+        )
+      ''');
+
+      await db.execute('''
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_datas_importantes_unique_titulo_data
+        ON datas_importantes(titulo, data)
+      ''');
+    }
+
+    if (oldVersion < 3) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS arquivos (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          caminho TEXT NOT NULL,
+          tipo TEXT NOT NULL,
+          data_criacao TEXT NOT NULL
+        )
+      ''');
+    }
   }
 
   Future<void> _onOpen(Database db) async {
@@ -163,10 +209,7 @@ class MiwanzoDatabase {
 
   Future<List<CategoryEntry>> fetchCategories() async {
     final db = await database;
-    final maps = await db.query(
-      'categorias',
-      orderBy: 'nome COLLATE NOCASE ASC',
-    );
+    final maps = await db.query('categorias', orderBy: 'id ASC');
     return maps.map(CategoryEntry.fromMap).toList(growable: false);
   }
 
@@ -259,5 +302,21 @@ class MiwanzoDatabase {
   Future<void> deletePreferenceItem(int id) async {
     final db = await database;
     await db.delete('itens', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<List<MediaEntry>> fetchMediaEntries() async {
+    final db = await database;
+    final maps = await db.query('arquivos', orderBy: 'data_criacao DESC, id DESC');
+    return maps.map(MediaEntry.fromMap).toList(growable: false);
+  }
+
+  Future<int> insertMediaEntry(MediaEntry entry) async {
+    final db = await database;
+    return db.insert('arquivos', entry.toMap());
+  }
+
+  Future<void> deleteMediaEntry(int id) async {
+    final db = await database;
+    await db.delete('arquivos', where: 'id = ?', whereArgs: [id]);
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../logging/app_logger.dart';
 import '../../models/important_date.dart';
 import '../../state/miwanzo_state.dart';
 import '../../utils/date_formatters.dart';
@@ -10,6 +11,7 @@ class ImportantDatesScreen extends StatelessWidget {
   const ImportantDatesScreen({required this.state, super.key});
 
   final MiwanzoState state;
+  static final AppLogger _logger = AppLogger.instance;
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +21,7 @@ class ImportantDatesScreen extends StatelessWidget {
         final dates = state.upcomingDates;
 
         return ListView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
           children: [
             SectionTitle(
               title: 'Datas Importantes',
@@ -54,20 +56,23 @@ class ImportantDatesScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _confirmDelete(BuildContext context, ImportantDate date) async {
+  Future<void> _confirmDelete(
+    BuildContext pageContext,
+    ImportantDate date,
+  ) async {
     final shouldDelete = await showDialog<bool>(
-      context: context,
-      builder: (context) {
+      context: pageContext,
+      builder: (dialogContext) {
         return AlertDialog(
           title: const Text('Excluir data?'),
           content: Text('Tem certeza que deseja excluir "${date.title}"?'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context, false),
+              onPressed: () => Navigator.pop(dialogContext, false),
               child: const Text('Cancelar'),
             ),
             FilledButton(
-              onPressed: () => Navigator.pop(context, true),
+              onPressed: () => Navigator.pop(dialogContext, true),
               child: const Text('Excluir'),
             ),
           ],
@@ -81,7 +86,7 @@ class ImportantDatesScreen extends StatelessWidget {
   }
 
   Future<void> _openDateForm(
-    BuildContext context, {
+    BuildContext pageContext, {
     ImportantDate? existing,
   }) async {
     final titleController = TextEditingController(text: existing?.title ?? '');
@@ -101,16 +106,17 @@ class ImportantDatesScreen extends StatelessWidget {
     var notify1Day = existing?.notify1Day ?? true;
     var notifyOnDay = existing?.notifyOnDay ?? true;
     var customEnabled = existing?.notifyCustomDays != null;
+    var isSaving = false;
 
     await showModalBottomSheet<void>(
-      context: context,
+      context: pageContext,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (context) {
+      builder: (sheetContext) {
         return StatefulBuilder(
-          builder: (context, setModalState) {
-            final bottom = MediaQuery.viewInsetsOf(context).bottom;
+          builder: (sheetContext, setModalState) {
+            final bottom = MediaQuery.viewInsetsOf(sheetContext).bottom;
 
             return Padding(
               padding: EdgeInsets.fromLTRB(16, 12, 16, bottom + 18),
@@ -124,11 +130,12 @@ class ImportantDatesScreen extends StatelessWidget {
                       children: [
                         Text(
                           existing == null ? 'Nova Data' : 'Editar Data',
-                          style: Theme.of(context).textTheme.titleLarge,
+                          style: Theme.of(sheetContext).textTheme.titleLarge,
                         ),
                         const SizedBox(height: 14),
                         TextFormField(
                           controller: titleController,
+                          enabled: !isSaving,
                           decoration: const InputDecoration(
                             labelText: 'Nome da data',
                             hintText: 'Ex: Aniversário',
@@ -143,6 +150,7 @@ class ImportantDatesScreen extends StatelessWidget {
                         const SizedBox(height: 10),
                         TextFormField(
                           controller: descriptionController,
+                          enabled: !isSaving,
                           maxLines: 3,
                           decoration: const InputDecoration(
                             labelText: 'Descrição',
@@ -153,18 +161,22 @@ class ImportantDatesScreen extends StatelessWidget {
                         const SizedBox(height: 12),
                         InkWell(
                           borderRadius: BorderRadius.circular(16),
-                          onTap: () async {
-                            final pickedDate = await showDatePicker(
-                              context: context,
-                              initialDate: selectedDate,
-                              firstDate: DateTime(2000),
-                              lastDate: DateTime(2100),
-                            );
+                          onTap: isSaving
+                              ? null
+                              : () async {
+                                  final pickedDate = await showDatePicker(
+                                    context: sheetContext,
+                                    initialDate: selectedDate,
+                                    firstDate: DateTime(2000),
+                                    lastDate: DateTime(2100),
+                                  );
 
-                            if (pickedDate != null) {
-                              setModalState(() => selectedDate = pickedDate);
-                            }
-                          },
+                                  if (pickedDate != null) {
+                                    setModalState(
+                                      () => selectedDate = pickedDate,
+                                    );
+                                  }
+                                },
                           child: Container(
                             width: double.infinity,
                             padding: const EdgeInsets.symmetric(
@@ -191,56 +203,71 @@ class ImportantDatesScreen extends StatelessWidget {
                         const SizedBox(height: 14),
                         Text(
                           'Notificações',
-                          style: Theme.of(context).textTheme.titleMedium,
+                          style: Theme.of(sheetContext).textTheme.titleMedium,
                         ),
                         const SizedBox(height: 8),
                         CheckboxListTile(
                           value: notify3Months,
-                          onChanged: (value) => setModalState(
-                            () => notify3Months = value ?? false,
-                          ),
+                          onChanged: isSaving
+                              ? null
+                              : (value) => setModalState(
+                                  () => notify3Months = value ?? false,
+                                ),
                           contentPadding: EdgeInsets.zero,
                           title: const Text('3 meses antes'),
                           controlAffinity: ListTileControlAffinity.leading,
                         ),
                         CheckboxListTile(
                           value: notify1Month,
-                          onChanged: (value) => setModalState(
-                            () => notify1Month = value ?? false,
-                          ),
+                          onChanged: isSaving
+                              ? null
+                              : (value) => setModalState(
+                                  () => notify1Month = value ?? false,
+                                ),
                           contentPadding: EdgeInsets.zero,
                           title: const Text('1 mês antes'),
                           controlAffinity: ListTileControlAffinity.leading,
                         ),
                         CheckboxListTile(
                           value: notify1Week,
-                          onChanged: (value) =>
-                              setModalState(() => notify1Week = value ?? false),
+                          onChanged: isSaving
+                              ? null
+                              : (value) => setModalState(
+                                  () => notify1Week = value ?? false,
+                                ),
                           contentPadding: EdgeInsets.zero,
                           title: const Text('1 semana antes'),
                           controlAffinity: ListTileControlAffinity.leading,
                         ),
                         CheckboxListTile(
                           value: notify1Day,
-                          onChanged: (value) =>
-                              setModalState(() => notify1Day = value ?? false),
+                          onChanged: isSaving
+                              ? null
+                              : (value) => setModalState(
+                                  () => notify1Day = value ?? false,
+                                ),
                           contentPadding: EdgeInsets.zero,
                           title: const Text('1 dia antes'),
                           controlAffinity: ListTileControlAffinity.leading,
                         ),
                         CheckboxListTile(
                           value: notifyOnDay,
-                          onChanged: (value) =>
-                              setModalState(() => notifyOnDay = value ?? false),
+                          onChanged: isSaving
+                              ? null
+                              : (value) => setModalState(
+                                  () => notifyOnDay = value ?? false,
+                                ),
                           contentPadding: EdgeInsets.zero,
                           title: const Text('No dia'),
                           controlAffinity: ListTileControlAffinity.leading,
                         ),
                         CheckboxListTile(
                           value: customEnabled,
-                          onChanged: (value) => setModalState(
-                            () => customEnabled = value ?? false,
-                          ),
+                          onChanged: isSaving
+                              ? null
+                              : (value) => setModalState(
+                                  () => customEnabled = value ?? false,
+                                ),
                           contentPadding: EdgeInsets.zero,
                           title: const Text(
                             'Definir dias personalizados antes',
@@ -250,6 +277,7 @@ class ImportantDatesScreen extends StatelessWidget {
                         if (customEnabled)
                           TextFormField(
                             controller: customDaysController,
+                            enabled: !isSaving,
                             keyboardType: TextInputType.number,
                             decoration: const InputDecoration(
                               labelText: 'Dias antes',
@@ -261,94 +289,162 @@ class ImportantDatesScreen extends StatelessWidget {
                           children: [
                             Expanded(
                               child: TextButton(
-                                onPressed: () => Navigator.pop(context),
+                                onPressed: isSaving
+                                    ? null
+                                    : () => Navigator.of(sheetContext).pop(),
                                 child: const Text('Cancelar'),
                               ),
                             ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: FilledButton(
-                                onPressed: () async {
-                                  if (!(formKey.currentState?.validate() ??
-                                      false)) {
-                                    return;
-                                  }
+                                onPressed: isSaving
+                                    ? null
+                                    : () async {
+                                        if (!(formKey.currentState
+                                                ?.validate() ??
+                                            false)) {
+                                          return;
+                                        }
 
-                                  final customDays = customEnabled
-                                      ? int.tryParse(
-                                          customDaysController.text.trim(),
-                                        )
-                                      : null;
+                                        final customDays = customEnabled
+                                            ? int.tryParse(
+                                                customDaysController.text
+                                                    .trim(),
+                                              )
+                                            : null;
 
-                                  if (customEnabled &&
-                                      (customDays == null || customDays <= 0)) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Informe um número válido de dias para notificação personalizada.',
+                                        if (customEnabled &&
+                                            (customDays == null ||
+                                                customDays <= 0)) {
+                                          ScaffoldMessenger.of(
+                                            pageContext,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Informe um número válido de dias para notificação personalizada.',
+                                              ),
+                                            ),
+                                          );
+                                          return;
+                                        }
+
+                                        final hasNotification =
+                                            notify3Months ||
+                                            notify1Month ||
+                                            notify1Week ||
+                                            notify1Day ||
+                                            notifyOnDay ||
+                                            customDays != null;
+
+                                        if (!hasNotification) {
+                                          ScaffoldMessenger.of(
+                                            pageContext,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Selecione pelo menos uma regra de notificação.',
+                                              ),
+                                            ),
+                                          );
+                                          return;
+                                        }
+
+                                        setModalState(() => isSaving = true);
+
+                                        try {
+                                          if (existing == null) {
+                                            await state.addImportantDate(
+                                              title: titleController.text
+                                                  .trim(),
+                                              description: descriptionController
+                                                  .text
+                                                  .trim(),
+                                              date: selectedDate,
+                                              notify3Months: notify3Months,
+                                              notify1Month: notify1Month,
+                                              notify1Week: notify1Week,
+                                              notify1Day: notify1Day,
+                                              notifyOnDay: notifyOnDay,
+                                              notifyCustomDays: customDays,
+                                            );
+                                          } else {
+                                            await state.updateImportantDate(
+                                              existing.copyWith(
+                                                title: titleController.text
+                                                    .trim(),
+                                                description:
+                                                    descriptionController.text
+                                                        .trim(),
+                                                date: selectedDate,
+                                                notify3Months: notify3Months,
+                                                notify1Month: notify1Month,
+                                                notify1Week: notify1Week,
+                                                notify1Day: notify1Day,
+                                                notifyOnDay: notifyOnDay,
+                                                notifyCustomDays: customDays,
+                                                clearCustomDays: !customEnabled,
+                                              ),
+                                            );
+                                          }
+
+                                          if (sheetContext.mounted) {
+                                            Navigator.of(sheetContext).pop();
+                                            return;
+                                          }
+                                        } on DuplicateImportantDateException {
+                                          _logger.warning(
+                                            'ImportantDatesScreen',
+                                            'Cadastro/edição bloqueado por duplicidade de título + data.',
+                                          );
+                                          if (pageContext.mounted) {
+                                            ScaffoldMessenger.of(
+                                              pageContext,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Já existe uma data importante com o mesmo nome e a mesma data.',
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        } catch (error, stackTrace) {
+                                          _logger.error(
+                                            'ImportantDatesScreen',
+                                            'Falha ao salvar data importante via formulário.',
+                                            error: error,
+                                            stackTrace: stackTrace,
+                                          );
+                                          if (pageContext.mounted) {
+                                            ScaffoldMessenger.of(
+                                              pageContext,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Não foi possível salvar a data agora. Tente novamente.',
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        }
+
+                                        if (sheetContext.mounted) {
+                                          setModalState(() => isSaving = false);
+                                        }
+                                      },
+                                child: isSaving
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
                                         ),
+                                      )
+                                    : Text(
+                                        existing == null
+                                            ? 'Salvar'
+                                            : 'Atualizar',
                                       ),
-                                    );
-                                    return;
-                                  }
-
-                                  final hasNotification =
-                                      notify3Months ||
-                                      notify1Month ||
-                                      notify1Week ||
-                                      notify1Day ||
-                                      notifyOnDay ||
-                                      customDays != null;
-
-                                  if (!hasNotification) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Selecione pelo menos uma regra de notificação.',
-                                        ),
-                                      ),
-                                    );
-                                    return;
-                                  }
-
-                                  if (existing == null) {
-                                    await state.addImportantDate(
-                                      title: titleController.text.trim(),
-                                      description: descriptionController.text
-                                          .trim(),
-                                      date: selectedDate,
-                                      notify3Months: notify3Months,
-                                      notify1Month: notify1Month,
-                                      notify1Week: notify1Week,
-                                      notify1Day: notify1Day,
-                                      notifyOnDay: notifyOnDay,
-                                      notifyCustomDays: customDays,
-                                    );
-                                  } else {
-                                    await state.updateImportantDate(
-                                      existing.copyWith(
-                                        title: titleController.text.trim(),
-                                        description: descriptionController.text
-                                            .trim(),
-                                        date: selectedDate,
-                                        notify3Months: notify3Months,
-                                        notify1Month: notify1Month,
-                                        notify1Week: notify1Week,
-                                        notify1Day: notify1Day,
-                                        notifyOnDay: notifyOnDay,
-                                        notifyCustomDays: customDays,
-                                        clearCustomDays: !customEnabled,
-                                      ),
-                                    );
-                                  }
-
-                                  if (context.mounted) {
-                                    Navigator.pop(context);
-                                  }
-                                },
-                                child: Text(
-                                  existing == null ? 'Salvar' : 'Atualizar',
-                                ),
                               ),
                             ),
                           ],
@@ -364,6 +460,7 @@ class ImportantDatesScreen extends StatelessWidget {
       },
     );
 
+    await Future<void>.delayed(const Duration(milliseconds: 300));
     titleController.dispose();
     descriptionController.dispose();
     customDaysController.dispose();

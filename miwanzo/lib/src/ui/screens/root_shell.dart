@@ -1,10 +1,14 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../state/miwanzo_state.dart';
 import '../../theme/app_theme.dart';
+import '../../updates/github_release_updater.dart';
 import '../widgets/glass_panel.dart';
 import 'dashboard_screen.dart';
+import 'files_screen.dart';
 import 'important_dates_screen.dart';
+import 'logs_screen.dart';
 import 'notes_screen.dart';
 import 'preferences_screen.dart';
 
@@ -17,7 +21,9 @@ class RootShell extends StatefulWidget {
 
 class _RootShellState extends State<RootShell> {
   late final MiwanzoState _state;
+  final GithubReleaseUpdater _releaseUpdater = GithubReleaseUpdater();
   int _currentIndex = 0;
+  bool _didCheckUpdates = false;
 
   @override
   void initState() {
@@ -48,9 +54,15 @@ class _RootShellState extends State<RootShell> {
           ImportantDatesScreen(state: _state),
           NotesScreen(state: _state),
           PreferencesScreen(state: _state),
+          FilesScreen(state: _state),
+          LogsScreen(),
         ];
 
         final isReady = !_state.isLoading && _state.errorMessage == null;
+        if (isReady && !_didCheckUpdates) {
+          _didCheckUpdates = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) => _checkForUpdates());
+        }
 
         Widget content;
         if (_state.isLoading) {
@@ -65,7 +77,7 @@ class _RootShellState extends State<RootShell> {
         }
 
         return Scaffold(
-          extendBody: true,
+          extendBody: false,
           body: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -97,58 +109,102 @@ class _RootShellState extends State<RootShell> {
                   ),
                 ),
                 SafeArea(
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 380),
-                    switchInCurve: Curves.easeOutCubic,
-                    switchOutCurve: Curves.easeInCubic,
-                    child: KeyedSubtree(
-                      key: ValueKey(
-                        '$_currentIndex-${_state.isLoading}-${_state.errorMessage != null}',
-                      ),
-                      child: content,
-                    ),
-                  ),
+                  bottom: false,
+                  child: isReady
+                      ? IndexedStack(
+                          index: _currentIndex,
+                          children: pages,
+                        )
+                      : content,
                 ),
               ],
             ),
           ),
           bottomNavigationBar: isReady
-              ? Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(24),
-                    child: NavigationBar(
-                      selectedIndex: _currentIndex,
-                      onDestinationSelected: _openSection,
-                      destinations: const [
-                        NavigationDestination(
-                          icon: Icon(Icons.home_outlined),
-                          selectedIcon: Icon(Icons.home),
-                          label: 'Início',
-                        ),
-                        NavigationDestination(
-                          icon: Icon(Icons.event_note_outlined),
-                          selectedIcon: Icon(Icons.event_note),
-                          label: 'Datas',
-                        ),
-                        NavigationDestination(
-                          icon: Icon(Icons.sticky_note_2_outlined),
-                          selectedIcon: Icon(Icons.sticky_note_2),
-                          label: 'Notas',
-                        ),
-                        NavigationDestination(
-                          icon: Icon(Icons.favorite_border),
-                          selectedIcon: Icon(Icons.favorite),
-                          label: 'Gostos',
-                        ),
-                      ],
-                    ),
+              ? SafeArea(
+                  top: false,
+                  child: NavigationBar(
+                    selectedIndex: _currentIndex,
+                    onDestinationSelected: _openSection,
+                    destinations: const [
+                      NavigationDestination(
+                        icon: Icon(Icons.home_outlined),
+                        selectedIcon: Icon(Icons.home),
+                        label: 'Inicio',
+                      ),
+                      NavigationDestination(
+                        icon: Icon(Icons.event_note_outlined),
+                        selectedIcon: Icon(Icons.event_note),
+                        label: 'Datas',
+                      ),
+                      NavigationDestination(
+                        icon: Icon(Icons.sticky_note_2_outlined),
+                        selectedIcon: Icon(Icons.sticky_note_2),
+                        label: 'Notas',
+                      ),
+                      NavigationDestination(
+                        icon: Icon(Icons.favorite_border),
+                        selectedIcon: Icon(Icons.favorite),
+                        label: 'Gostos',
+                      ),
+                      NavigationDestination(
+                        icon: Icon(Icons.collections_outlined),
+                        selectedIcon: Icon(Icons.collections),
+                        label: 'Arquivos',
+                      ),
+                      NavigationDestination(
+                        icon: Icon(Icons.receipt_long_outlined),
+                        selectedIcon: Icon(Icons.receipt_long),
+                        label: 'Logs',
+                      ),
+                    ],
                   ),
                 )
               : null,
         );
       },
     );
+  }
+
+  Future<void> _checkForUpdates() async {
+    final update = await _releaseUpdater.checkForUpdates();
+    if (!mounted || update == null) return;
+
+    final shouldUpdate = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Nova versao disponivel'),
+          content: Text(
+            'Versao atual: ${update.currentVersion}\n'
+            'Nova versao: ${update.latestVersion}\n\n'
+            'Deseja baixar a atualizacao agora?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Depois'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Atualizar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (!(shouldUpdate ?? false)) return;
+
+    final uri = Uri.parse(update.downloadUrl);
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nao foi possivel abrir o link de atualizacao.'),
+        ),
+      );
+    }
   }
 }
 
