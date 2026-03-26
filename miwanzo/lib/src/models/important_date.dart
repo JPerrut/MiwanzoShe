@@ -4,6 +4,7 @@ class ImportantDate {
     required this.title,
     required this.description,
     required this.date,
+    required this.repeatsAnnually,
     required this.notify3Months,
     required this.notify1Month,
     required this.notify1Week,
@@ -16,6 +17,7 @@ class ImportantDate {
   final String title;
   final String description;
   final DateTime date;
+  final bool repeatsAnnually;
 
   final bool notify3Months;
   final bool notify1Month;
@@ -25,6 +27,10 @@ class ImportantDate {
   final int? notifyCustomDays;
 
   DateTime get nextOccurrence {
+    if (!repeatsAnnually) {
+      return DateTime(date.year, date.month, date.day);
+    }
+
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     var occurrence = _safeDate(now.year, date.month, date.day);
@@ -47,6 +53,7 @@ class ImportantDate {
     String? title,
     String? description,
     DateTime? date,
+    bool? repeatsAnnually,
     bool? notify3Months,
     bool? notify1Month,
     bool? notify1Week,
@@ -60,6 +67,7 @@ class ImportantDate {
       title: title ?? this.title,
       description: description ?? this.description,
       date: date ?? this.date,
+      repeatsAnnually: repeatsAnnually ?? this.repeatsAnnually,
       notify3Months: notify3Months ?? this.notify3Months,
       notify1Month: notify1Month ?? this.notify1Month,
       notify1Week: notify1Week ?? this.notify1Week,
@@ -76,6 +84,7 @@ class ImportantDate {
       'titulo': title,
       'descricao': description,
       'data': date.toIso8601String(),
+      'repetir_anualmente': repeatsAnnually ? 1 : 0,
       'notificacao_3_meses': notify3Months ? 1 : 0,
       'notificacao_1_mes': notify1Month ? 1 : 0,
       'notificacao_1_semana': notify1Week ? 1 : 0,
@@ -99,6 +108,7 @@ class ImportantDate {
       date: DateTime.parse(
         (map['data'] as String?) ?? DateTime.now().toIso8601String(),
       ),
+      repeatsAnnually: ((map['repetir_anualmente'] as num?) ?? 1).toInt() == 1,
       notify3Months: ((map['notificacao_3_meses'] as num?) ?? 0).toInt() == 1,
       notify1Month: ((map['notificacao_1_mes'] as num?) ?? 0).toInt() == 1,
       notify1Week: ((map['notificacao_1_semana'] as num?) ?? 0).toInt() == 1,

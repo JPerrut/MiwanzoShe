@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../logging/app_logger.dart';
 import '../../models/note_entry.dart';
@@ -315,9 +316,92 @@ class _NoteCard extends StatelessWidget {
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 10),
-          Text(note.description),
+          _LinkAwareText(text: note.description),
         ],
       ),
     );
+  }
+}
+
+class _LinkAwareText extends StatelessWidget {
+  const _LinkAwareText({required this.text});
+
+  final String text;
+
+  static final RegExp _urlRegex = RegExp(
+    r'((?:https?:\/\/|www\.)[^\s]+)',
+    caseSensitive: false,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final raw = text.trim();
+    if (raw.isEmpty) return const SizedBox.shrink();
+
+    final links = _extractLinks(raw);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(raw),
+        if (links.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: links
+                .map(
+                  (link) => ActionChip(
+                    avatar: const Icon(Icons.link, size: 16),
+                    label: Text(_chipLabel(link)),
+                    onPressed: () => _openLink(context, link),
+                  ),
+                )
+                .toList(growable: false),
+          ),
+        ],
+      ],
+    );
+  }
+
+  List<String> _extractLinks(String rawText) {
+    final found = <String>{};
+    for (final match in _urlRegex.allMatches(rawText)) {
+      final rawLink = match.group(0)?.trim();
+      if (rawLink == null || rawLink.isEmpty) continue;
+      found.add(_sanitizeLink(rawLink));
+    }
+    return found.toList(growable: false);
+  }
+
+  String _sanitizeLink(String link) {
+    return link.replaceAll(RegExp(r'[.,;:!?)\]}]+$'), '');
+  }
+
+  String _chipLabel(String link) {
+    const maxLength = 36;
+    if (link.length <= maxLength) return link;
+    return '${link.substring(0, maxLength - 3)}...';
+  }
+
+  Future<void> _openLink(BuildContext context, String link) async {
+    final withScheme = link.startsWith('http://') || link.startsWith('https://')
+        ? link
+        : 'https://$link';
+    final uri = Uri.tryParse(withScheme);
+
+    if (uri == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Link invalido.')));
+      return;
+    }
+
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nao foi possivel abrir o link.')),
+      );
+    }
   }
 }

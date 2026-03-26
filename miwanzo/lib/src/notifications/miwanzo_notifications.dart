@@ -77,7 +77,7 @@ class MiwanzoNotifications {
     final rules = _buildRules(date);
 
     for (final rule in rules) {
-      final nextTrigger = _computeNextTrigger(date.date, rule.offset);
+      final nextTrigger = _computeNextTrigger(date, rule.offset);
       if (nextTrigger == null) continue;
 
       await _plugin.zonedSchedule(
@@ -188,10 +188,25 @@ class MiwanzoNotifications {
   }
 
   tz.TZDateTime? _computeNextTrigger(
-    DateTime baseDate,
+    ImportantDate date,
     _RelativeOffset offset,
   ) {
     final now = tz.TZDateTime.now(tz.local);
+    final baseDate = date.date;
+
+    if (!date.repeatsAnnually) {
+      final oneTimeOccurrence = _safeDate(
+        baseDate.year,
+        baseDate.month,
+        baseDate.day,
+      );
+      final trigger = _applyOffset(oneTimeOccurrence, offset);
+      if (trigger.isAfter(now.add(const Duration(minutes: 1)))) {
+        return trigger;
+      }
+      return null;
+    }
+
     final eventMonth = baseDate.month;
     final eventDay = baseDate.day;
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../logging/app_logger.dart';
 import '../../models/important_date.dart';
@@ -25,7 +26,7 @@ class ImportantDatesScreen extends StatelessWidget {
           children: [
             SectionTitle(
               title: 'Datas Importantes',
-              subtitle: 'Cadastre momentos que você não quer esquecer.',
+              subtitle: 'Cadastre momentos que voce nao quer esquecer.',
               trailing: FilledButton.icon(
                 onPressed: () => _openDateForm(context),
                 icon: const Icon(Icons.add),
@@ -36,7 +37,7 @@ class ImportantDatesScreen extends StatelessWidget {
             if (dates.isEmpty)
               const GlassPanel(
                 child: Text(
-                  'Nenhuma data cadastrada ainda. Toque em "Adicionar" para começar.',
+                  'Nenhuma data cadastrada ainda. Toque em "Adicionar" para comecar.',
                 ),
               )
             else
@@ -100,6 +101,14 @@ class ImportantDatesScreen extends StatelessWidget {
 
     var selectedDate =
         existing?.date ?? DateTime.now().add(const Duration(days: 7));
+    var repeatsAnnually = existing?.repeatsAnnually ?? true;
+    if (repeatsAnnually) {
+      selectedDate = DateTime(
+        DateTime.now().year,
+        selectedDate.month,
+        selectedDate.day,
+      );
+    }
     var notify3Months = existing?.notify3Months ?? false;
     var notify1Month = existing?.notify1Month ?? true;
     var notify1Week = existing?.notify1Week ?? true;
@@ -138,7 +147,7 @@ class ImportantDatesScreen extends StatelessWidget {
                           enabled: !isSaving,
                           decoration: const InputDecoration(
                             labelText: 'Nome da data',
-                            hintText: 'Ex: Aniversário',
+                            hintText: 'Ex: Aniversario',
                           ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
@@ -153,9 +162,9 @@ class ImportantDatesScreen extends StatelessWidget {
                           enabled: !isSaving,
                           maxLines: 3,
                           decoration: const InputDecoration(
-                            labelText: 'Descrição',
+                            labelText: 'Anotacoes',
                             hintText:
-                                'Detalhes importantes para lembrar depois',
+                                'Detalhes importantes e links para lembrar depois',
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -172,9 +181,15 @@ class ImportantDatesScreen extends StatelessWidget {
                                   );
 
                                   if (pickedDate != null) {
-                                    setModalState(
-                                      () => selectedDate = pickedDate,
-                                    );
+                                    setModalState(() {
+                                      selectedDate = repeatsAnnually
+                                          ? DateTime(
+                                              DateTime.now().year,
+                                              pickedDate.month,
+                                              pickedDate.day,
+                                            )
+                                          : pickedDate;
+                                    });
                                   }
                                 },
                           child: Container(
@@ -192,17 +207,39 @@ class ImportantDatesScreen extends StatelessWidget {
                                 const Icon(Icons.calendar_month),
                                 const SizedBox(width: 10),
                                 Text(
-                                  DateFormatters.friendlyDateWithYear(
-                                    selectedDate,
-                                  ),
+                                  repeatsAnnually
+                                      ? '${DateFormatters.friendlyDate(selectedDate)} (repete todo ano)'
+                                      : DateFormatters.friendlyDateWithYear(
+                                          selectedDate,
+                                        ),
                                 ),
                               ],
                             ),
                           ),
                         ),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 10),
+                        CheckboxListTile(
+                          value: repeatsAnnually,
+                          onChanged: isSaving
+                              ? null
+                              : (value) => setModalState(() {
+                                  repeatsAnnually = value ?? true;
+                                  if (repeatsAnnually) {
+                                    selectedDate = DateTime(
+                                      DateTime.now().year,
+                                      selectedDate.month,
+                                      selectedDate.day,
+                                    );
+                                  }
+                                }),
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Repetir todos os anos'),
+                          subtitle: const Text('Usa somente dia e mes'),
+                          controlAffinity: ListTileControlAffinity.leading,
+                        ),
+                        const SizedBox(height: 8),
                         Text(
-                          'Notificações',
+                          'Notificacoes',
                           style: Theme.of(sheetContext).textTheme.titleMedium,
                         ),
                         const SizedBox(height: 8),
@@ -225,7 +262,7 @@ class ImportantDatesScreen extends StatelessWidget {
                                   () => notify1Month = value ?? false,
                                 ),
                           contentPadding: EdgeInsets.zero,
-                          title: const Text('1 mês antes'),
+                          title: const Text('1 mes antes'),
                           controlAffinity: ListTileControlAffinity.leading,
                         ),
                         CheckboxListTile(
@@ -322,7 +359,7 @@ class ImportantDatesScreen extends StatelessWidget {
                                           ).showSnackBar(
                                             const SnackBar(
                                               content: Text(
-                                                'Informe um número válido de dias para notificação personalizada.',
+                                                'Informe um numero valido de dias para notificacao personalizada.',
                                               ),
                                             ),
                                           );
@@ -343,7 +380,7 @@ class ImportantDatesScreen extends StatelessWidget {
                                           ).showSnackBar(
                                             const SnackBar(
                                               content: Text(
-                                                'Selecione pelo menos uma regra de notificação.',
+                                                'Selecione pelo menos uma regra de notificacao.',
                                               ),
                                             ),
                                           );
@@ -361,6 +398,7 @@ class ImportantDatesScreen extends StatelessWidget {
                                                   .text
                                                   .trim(),
                                               date: selectedDate,
+                                              repeatsAnnually: repeatsAnnually,
                                               notify3Months: notify3Months,
                                               notify1Month: notify1Month,
                                               notify1Week: notify1Week,
@@ -377,6 +415,8 @@ class ImportantDatesScreen extends StatelessWidget {
                                                     descriptionController.text
                                                         .trim(),
                                                 date: selectedDate,
+                                                repeatsAnnually:
+                                                    repeatsAnnually,
                                                 notify3Months: notify3Months,
                                                 notify1Month: notify1Month,
                                                 notify1Week: notify1Week,
@@ -395,7 +435,7 @@ class ImportantDatesScreen extends StatelessWidget {
                                         } on DuplicateImportantDateException {
                                           _logger.warning(
                                             'ImportantDatesScreen',
-                                            'Cadastro/edição bloqueado por duplicidade de título + data.',
+                                            'Cadastro/edicao bloqueado por duplicidade de titulo + data.',
                                           );
                                           if (pageContext.mounted) {
                                             ScaffoldMessenger.of(
@@ -403,7 +443,7 @@ class ImportantDatesScreen extends StatelessWidget {
                                             ).showSnackBar(
                                               const SnackBar(
                                                 content: Text(
-                                                  'Já existe uma data importante com o mesmo nome e a mesma data.',
+                                                  'Ja existe uma data importante com o mesmo nome e a mesma data.',
                                                 ),
                                               ),
                                             );
@@ -411,7 +451,7 @@ class ImportantDatesScreen extends StatelessWidget {
                                         } catch (error, stackTrace) {
                                           _logger.error(
                                             'ImportantDatesScreen',
-                                            'Falha ao salvar data importante via formulário.',
+                                            'Falha ao salvar data importante via formulario.',
                                             error: error,
                                             stackTrace: stackTrace,
                                           );
@@ -421,7 +461,7 @@ class ImportantDatesScreen extends StatelessWidget {
                                             ).showSnackBar(
                                               const SnackBar(
                                                 content: Text(
-                                                  'Não foi possível salvar a data agora. Tente novamente.',
+                                                  'Nao foi possivel salvar a data agora. Tente novamente.',
                                                 ),
                                               ),
                                             );
@@ -503,9 +543,14 @@ class _ImportantDateCard extends StatelessWidget {
                       DateFormatters.friendlyDateWithYear(date.nextOccurrence),
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
+                    if (date.repeatsAnnually)
+                      Text(
+                        'Repete todo ano',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                     if (date.description.trim().isNotEmpty) ...[
                       const SizedBox(height: 8),
-                      Text(date.description),
+                      _LinkAwareText(text: date.description),
                     ],
                   ],
                 ),
@@ -544,7 +589,8 @@ class _ImportantDateCard extends StatelessWidget {
 
   String _daysLabel(int days) {
     if (days == 0) return 'Hoje';
-    if (days == 1) return 'Amanhã';
+    if (days == 1) return 'Amanha';
+    if (days < 0) return 'Ha ${days.abs()} dias';
     return 'Em $days dias';
   }
 
@@ -552,7 +598,7 @@ class _ImportantDateCard extends StatelessWidget {
     final labels = <String>[];
 
     if (date.notify3Months) labels.add('3 meses antes');
-    if (date.notify1Month) labels.add('1 mês antes');
+    if (date.notify1Month) labels.add('1 mes antes');
     if (date.notify1Week) labels.add('1 semana antes');
     if (date.notify1Day) labels.add('1 dia antes');
     if (date.notifyOnDay) labels.add('No dia');
@@ -561,5 +607,88 @@ class _ImportantDateCard extends StatelessWidget {
     }
 
     return labels;
+  }
+}
+
+class _LinkAwareText extends StatelessWidget {
+  const _LinkAwareText({required this.text});
+
+  final String text;
+
+  static final RegExp _urlRegex = RegExp(
+    r'((?:https?:\/\/|www\.)[^\s]+)',
+    caseSensitive: false,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final raw = text.trim();
+    if (raw.isEmpty) return const SizedBox.shrink();
+
+    final links = _extractLinks(raw);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(raw),
+        if (links.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: links
+                .map(
+                  (link) => ActionChip(
+                    avatar: const Icon(Icons.link, size: 16),
+                    label: Text(_chipLabel(link)),
+                    onPressed: () => _openLink(context, link),
+                  ),
+                )
+                .toList(growable: false),
+          ),
+        ],
+      ],
+    );
+  }
+
+  List<String> _extractLinks(String rawText) {
+    final found = <String>{};
+    for (final match in _urlRegex.allMatches(rawText)) {
+      final rawLink = match.group(0)?.trim();
+      if (rawLink == null || rawLink.isEmpty) continue;
+      found.add(_sanitizeLink(rawLink));
+    }
+    return found.toList(growable: false);
+  }
+
+  String _sanitizeLink(String link) {
+    return link.replaceAll(RegExp(r'[.,;:!?)\]}]+$'), '');
+  }
+
+  String _chipLabel(String link) {
+    const maxLength = 36;
+    if (link.length <= maxLength) return link;
+    return '${link.substring(0, maxLength - 3)}...';
+  }
+
+  Future<void> _openLink(BuildContext context, String link) async {
+    final withScheme = link.startsWith('http://') || link.startsWith('https://')
+        ? link
+        : 'https://$link';
+    final uri = Uri.tryParse(withScheme);
+
+    if (uri == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Link invalido.')));
+      return;
+    }
+
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nao foi possivel abrir o link.')),
+      );
+    }
   }
 }

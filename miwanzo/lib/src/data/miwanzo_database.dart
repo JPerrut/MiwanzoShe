@@ -17,7 +17,7 @@ class MiwanzoDatabase {
   static final MiwanzoDatabase instance = MiwanzoDatabase._();
 
   static const String _databaseName = 'miwanzo.db';
-  static const int _databaseVersion = 3;
+  static const int _databaseVersion = 4;
 
   static const List<String> _defaultCategories = [
     'Comidas',
@@ -91,6 +91,7 @@ class MiwanzoDatabase {
         titulo TEXT NOT NULL,
         descricao TEXT,
         data TEXT NOT NULL,
+        repetir_anualmente INTEGER NOT NULL DEFAULT 1,
         notificacao_3_meses INTEGER NOT NULL DEFAULT 0,
         notificacao_1_mes INTEGER NOT NULL DEFAULT 0,
         notificacao_1_semana INTEGER NOT NULL DEFAULT 0,
@@ -171,6 +172,13 @@ class MiwanzoDatabase {
           tipo TEXT NOT NULL,
           data_criacao TEXT NOT NULL
         )
+      ''');
+    }
+
+    if (oldVersion < 4) {
+      await db.execute('''
+        ALTER TABLE datas_importantes
+        ADD COLUMN repetir_anualmente INTEGER NOT NULL DEFAULT 1
       ''');
     }
   }
@@ -306,7 +314,10 @@ class MiwanzoDatabase {
 
   Future<List<MediaEntry>> fetchMediaEntries() async {
     final db = await database;
-    final maps = await db.query('arquivos', orderBy: 'data_criacao DESC, id DESC');
+    final maps = await db.query(
+      'arquivos',
+      orderBy: 'data_criacao DESC, id DESC',
+    );
     return maps.map(MediaEntry.fromMap).toList(growable: false);
   }
 

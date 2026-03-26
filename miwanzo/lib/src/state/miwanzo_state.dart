@@ -138,6 +138,7 @@ class MiwanzoState extends ChangeNotifier {
     required String title,
     required String description,
     required DateTime date,
+    required bool repeatsAnnually,
     required bool notify3Months,
     required bool notify1Month,
     required bool notify1Week,
@@ -145,7 +146,11 @@ class MiwanzoState extends ChangeNotifier {
     required bool notifyOnDay,
     int? notifyCustomDays,
   }) async {
-    if (_hasDuplicateImportantDate(title: title, date: date)) {
+    if (_hasDuplicateImportantDate(
+      title: title,
+      date: date,
+      repeatsAnnually: repeatsAnnually,
+    )) {
       _logger.warning(
         'MiwanzoState',
         'Tentativa de cadastro duplicado de data importante.',
@@ -158,6 +163,7 @@ class MiwanzoState extends ChangeNotifier {
       title: title,
       description: description,
       date: date,
+      repeatsAnnually: repeatsAnnually,
       notify3Months: notify3Months,
       notify1Month: notify1Month,
       notify1Week: notify1Week,
@@ -208,6 +214,7 @@ class MiwanzoState extends ChangeNotifier {
     if (_hasDuplicateImportantDate(
       title: date.title,
       date: date.date,
+      repeatsAnnually: date.repeatsAnnually,
       excludeId: date.id,
     )) {
       _logger.warning(
@@ -520,14 +527,24 @@ class MiwanzoState extends ChangeNotifier {
   bool _hasDuplicateImportantDate({
     required String title,
     required DateTime date,
+    required bool repeatsAnnually,
     int? excludeId,
   }) {
     final normalizedTitle = title.trim();
-    final targetDate = DateTime(date.year, date.month, date.day);
 
     return _importantDates.any((existing) {
       if (excludeId != null && existing.id == excludeId) {
         return false;
+      }
+
+      if (existing.title.trim() != normalizedTitle ||
+          existing.repeatsAnnually != repeatsAnnually) {
+        return false;
+      }
+
+      if (repeatsAnnually) {
+        return existing.date.month == date.month &&
+            existing.date.day == date.day;
       }
 
       final existingDate = DateTime(
@@ -535,9 +552,8 @@ class MiwanzoState extends ChangeNotifier {
         existing.date.month,
         existing.date.day,
       );
-
-      return existing.title.trim() == normalizedTitle &&
-          existingDate == targetDate;
+      final targetDate = DateTime(date.year, date.month, date.day);
+      return existingDate == targetDate;
     });
   }
 }
