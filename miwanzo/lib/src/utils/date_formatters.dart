@@ -7,6 +7,8 @@ class DateFormatters {
     "dd 'de' MMM 'de' yyyy",
     'pt_BR',
   );
+  static final DateFormat _hourMinute = DateFormat('HH:mm');
+  static final DateFormat _fullDateTime = DateFormat('dd/MM/yyyy HH:mm');
 
   static String fullDate(DateTime date) => _fullDate.format(date);
 
@@ -14,4 +16,9 @@ class DateFormatters {
 
   static String friendlyDateWithYear(DateTime date) =>
       _friendlyDateWithYear.format(date);
+
+  static String hourMinute(int hour, int minute) =>
+      _hourMinute.format(DateTime(2000, 1, 1, hour, minute));
+
+  static String fullDateTime(DateTime dateTime) => _fullDateTime.format(dateTime);
 }

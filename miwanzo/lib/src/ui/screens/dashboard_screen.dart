@@ -6,17 +6,11 @@ import '../../models/preference_item.dart';
 import '../../state/miwanzo_state.dart';
 import '../../utils/date_formatters.dart';
 import '../widgets/glass_panel.dart';
-import '../widgets/section_title.dart';
 
 class DashboardScreen extends StatelessWidget {
-  const DashboardScreen({
-    required this.state,
-    required this.onOpenSection,
-    super.key,
-  });
+  const DashboardScreen({required this.state, super.key});
 
   final MiwanzoState state;
-  final ValueChanged<int> onOpenSection;
 
   @override
   Widget build(BuildContext context) {
@@ -37,50 +31,6 @@ class DashboardScreen extends StatelessWidget {
             Text(
               'Organize lembranças, gostos e ideias em um só lugar.',
               style: textTheme.bodyLarge,
-            ),
-            const SizedBox(height: 16),
-            GlassPanel(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SectionTitle(
-                    title: 'Acessos Rápidos',
-                    subtitle: 'Navegue para cada área do aplicativo',
-                  ),
-                  const SizedBox(height: 14),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      _QuickAction(
-                        label: 'Datas',
-                        icon: Icons.event,
-                        onTap: () => onOpenSection(1),
-                      ),
-                      _QuickAction(
-                        label: 'Notas',
-                        icon: Icons.note,
-                        onTap: () => onOpenSection(2),
-                      ),
-                      _QuickAction(
-                        label: 'Gostos',
-                        icon: Icons.favorite,
-                        onTap: () => onOpenSection(3),
-                      ),
-                      _QuickAction(
-                        label: 'Logs',
-                        icon: Icons.receipt_long,
-                        onTap: () => onOpenSection(4),
-                      ),
-                      _QuickAction(
-                        label: 'Resumo',
-                        icon: Icons.dashboard,
-                        onTap: () => onOpenSection(0),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
             ),
             const SizedBox(height: 16),
             _DashboardSection(
@@ -127,45 +77,6 @@ class DashboardScreen extends StatelessWidget {
           ],
         );
       },
-    );
-  }
-}
-
-class _QuickAction extends StatelessWidget {
-  const _QuickAction({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    return Material(
-      color: colors.primary.withValues(alpha: 0.08),
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: SizedBox(
-          width: 148,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            child: Row(
-              children: [
-                Icon(icon, size: 20, color: colors.primary),
-                const SizedBox(width: 8),
-                Text(label),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
@@ -222,7 +133,7 @@ class _DatePreviewTile extends StatelessWidget {
     };
 
     return _PreviewTile(
-      leading: const Icon(Icons.cake_outlined),
+      leading: const Icon(Icons.calendar_month_outlined),
       title: date.title,
       subtitle: DateFormatters.friendlyDateWithYear(date.nextOccurrence),
       trailingText: suffix,
@@ -240,7 +151,7 @@ class _NotePreviewTile extends StatelessWidget {
     return _PreviewTile(
       leading: const Icon(Icons.note_alt_outlined),
       title: note.title,
-      subtitle: '#${note.tag} · ${DateFormatters.fullDate(note.createdAt)}',
+      subtitle: '#${note.tag} - ${DateFormatters.fullDate(note.createdAt)}',
       trailingText: '',
     );
   }

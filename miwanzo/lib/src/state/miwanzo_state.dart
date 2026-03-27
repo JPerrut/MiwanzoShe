@@ -45,8 +45,25 @@ class MiwanzoState extends ChangeNotifier {
 
   List<ImportantDate> get upcomingDates {
     final dates = List<ImportantDate>.from(_importantDates)
+      ..removeWhere((date) => date.isPastNonRepeating)
       ..sort((a, b) => a.nextOccurrence.compareTo(b.nextOccurrence));
     return dates;
+  }
+
+  List<ImportantDate> get allDatesForList {
+    final upcoming = _importantDates
+        .where((date) => !date.isPastNonRepeating)
+        .toList(growable: false);
+    final past = _importantDates
+        .where((date) => date.isPastNonRepeating)
+        .toList(growable: false);
+
+    final upcomingSorted = List<ImportantDate>.from(upcoming)
+      ..sort((a, b) => a.nextOccurrence.compareTo(b.nextOccurrence));
+    final pastSorted = List<ImportantDate>.from(past)
+      ..sort((a, b) => b.date.compareTo(a.date));
+
+    return [...upcomingSorted, ...pastSorted];
   }
 
   List<NoteEntry> get notes {
@@ -79,7 +96,7 @@ class MiwanzoState extends ChangeNotifier {
   }
 
   Future<void> _initialize() async {
-    _logger.info('MiwanzoState', 'Inicialização iniciada.');
+    _logger.info('MiwanzoState', 'InicializaÃ§Ã£o iniciada.');
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
@@ -93,7 +110,7 @@ class MiwanzoState extends ChangeNotifier {
       } catch (error, stackTrace) {
         _logger.error(
           'MiwanzoState',
-          'Falha ao sincronizar notificações na inicialização.',
+          'Falha ao sincronizar notificaÃ§Ãµes na inicializaÃ§Ã£o.',
           error: error,
           stackTrace: stackTrace,
         );
@@ -101,17 +118,17 @@ class MiwanzoState extends ChangeNotifier {
 
       _logger.info(
         'MiwanzoState',
-        'Inicialização concluída. Datas: ${_importantDates.length}, Notas: ${_notes.length}, Itens: ${_preferenceItems.length}.',
+        'InicializaÃ§Ã£o concluÃ­da. Datas: ${_importantDates.length}, Notas: ${_notes.length}, Itens: ${_preferenceItems.length}.',
       );
     } catch (error, stackTrace) {
       _logger.error(
         'MiwanzoState',
-        'Falha na inicialização.',
+        'Falha na inicializaÃ§Ã£o.',
         error: error,
         stackTrace: stackTrace,
       );
       _errorMessage =
-          'Não foi possível carregar os dados locais. Verifique o armazenamento do dispositivo.';
+          'NÃ£o foi possÃ­vel carregar os dados locais. Verifique o armazenamento do dispositivo.';
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -138,13 +155,11 @@ class MiwanzoState extends ChangeNotifier {
     required String title,
     required String description,
     required DateTime date,
+    required int notificationHour,
+    required int notificationMinute,
     required bool repeatsAnnually,
-    required bool notify3Months,
-    required bool notify1Month,
-    required bool notify1Week,
-    required bool notify1Day,
-    required bool notifyOnDay,
-    int? notifyCustomDays,
+    required bool notificationsEnabled,
+    List<DateTime> notifyCustomDates = const [],
   }) async {
     if (_hasDuplicateImportantDate(
       title: title,
@@ -163,13 +178,15 @@ class MiwanzoState extends ChangeNotifier {
       title: title,
       description: description,
       date: date,
+      notificationHour: notificationHour,
+      notificationMinute: notificationMinute,
       repeatsAnnually: repeatsAnnually,
-      notify3Months: notify3Months,
-      notify1Month: notify1Month,
-      notify1Week: notify1Week,
-      notify1Day: notify1Day,
-      notifyOnDay: notifyOnDay,
-      notifyCustomDays: notifyCustomDays,
+      notify3Months: notificationsEnabled,
+      notify1Month: notificationsEnabled,
+      notify1Week: notificationsEnabled,
+      notify1Day: notificationsEnabled,
+      notifyOnDay: false,
+      notifyCustomDates: notificationsEnabled ? notifyCustomDates : const [],
     );
 
     _logger.info(
@@ -189,7 +206,7 @@ class MiwanzoState extends ChangeNotifier {
       } catch (error, stackTrace) {
         _logger.error(
           'MiwanzoState',
-          'Data salva, mas falhou ao agendar notificação.',
+          'Data salva, mas falhou ao agendar notificaÃ§Ã£o.',
           error: error,
           stackTrace: stackTrace,
         );
@@ -219,7 +236,7 @@ class MiwanzoState extends ChangeNotifier {
     )) {
       _logger.warning(
         'MiwanzoState',
-        'Tentativa de atualização duplicada de data importante (id=${date.id}).',
+        'Tentativa de atualizaÃ§Ã£o duplicada de data importante (id=${date.id}).',
       );
       throw const DuplicateImportantDateException();
     }
@@ -236,7 +253,7 @@ class MiwanzoState extends ChangeNotifier {
       if (index == -1) {
         _logger.warning(
           'MiwanzoState',
-          'Data atualizada no banco, mas não encontrada em memória (id=${date.id}).',
+          'Data atualizada no banco, mas nÃ£o encontrada em memÃ³ria (id=${date.id}).',
         );
         return;
       }
@@ -249,7 +266,7 @@ class MiwanzoState extends ChangeNotifier {
       } catch (error, stackTrace) {
         _logger.error(
           'MiwanzoState',
-          'Data atualizada, mas falhou ao reagendar notificação (id=${date.id}).',
+          'Data atualizada, mas falhou ao reagendar notificaÃ§Ã£o (id=${date.id}).',
           error: error,
           stackTrace: stackTrace,
         );
@@ -283,13 +300,13 @@ class MiwanzoState extends ChangeNotifier {
       } catch (error, stackTrace) {
         _logger.error(
           'MiwanzoState',
-          'Data excluída, mas falhou ao cancelar notificações (id=$id).',
+          'Data excluÃ­da, mas falhou ao cancelar notificaÃ§Ãµes (id=$id).',
           error: error,
           stackTrace: stackTrace,
         );
       }
 
-      _logger.info('MiwanzoState', 'Data importante excluída (id=$id).');
+      _logger.info('MiwanzoState', 'Data importante excluÃ­da (id=$id).');
     } catch (error, stackTrace) {
       _logger.error(
         'MiwanzoState',
@@ -342,7 +359,7 @@ class MiwanzoState extends ChangeNotifier {
       if (index == -1) {
         _logger.warning(
           'MiwanzoState',
-          'Nota atualizada no banco, mas não encontrada em memória (id=${note.id}).',
+          'Nota atualizada no banco, mas nÃ£o encontrada em memÃ³ria (id=${note.id}).',
         );
         return;
       }
@@ -368,7 +385,7 @@ class MiwanzoState extends ChangeNotifier {
       await _database.deleteNote(id);
       _notes.removeWhere((item) => item.id == id);
       notifyListeners();
-      _logger.info('MiwanzoState', 'Nota excluída (id=$id).');
+      _logger.info('MiwanzoState', 'Nota excluÃ­da (id=$id).');
     } catch (error, stackTrace) {
       _logger.error(
         'MiwanzoState',
@@ -398,7 +415,7 @@ class MiwanzoState extends ChangeNotifier {
 
     _logger.info(
       'MiwanzoState',
-      'Salvando item de preferência "$name" (categoria="$category").',
+      'Salvando item de preferÃªncia "$name" (categoria="$category").',
     );
 
     try {
@@ -407,12 +424,12 @@ class MiwanzoState extends ChangeNotifier {
       notifyListeners();
       _logger.info(
         'MiwanzoState',
-        'Item de preferência salvo com sucesso (id=$insertedId).',
+        'Item de preferÃªncia salvo com sucesso (id=$insertedId).',
       );
     } catch (error, stackTrace) {
       _logger.error(
         'MiwanzoState',
-        'Falha ao salvar item de preferência.',
+        'Falha ao salvar item de preferÃªncia.',
         error: error,
         stackTrace: stackTrace,
       );
@@ -423,7 +440,7 @@ class MiwanzoState extends ChangeNotifier {
   Future<void> updatePreferenceItem(PreferenceItem item) async {
     _logger.info(
       'MiwanzoState',
-      'Atualizando item de preferência (id=${item.id}).',
+      'Atualizando item de preferÃªncia (id=${item.id}).',
     );
 
     try {
@@ -435,7 +452,7 @@ class MiwanzoState extends ChangeNotifier {
       if (index == -1) {
         _logger.warning(
           'MiwanzoState',
-          'Item atualizado no banco, mas não encontrado em memória (id=${item.id}).',
+          'Item atualizado no banco, mas nÃ£o encontrado em memÃ³ria (id=${item.id}).',
         );
         return;
       }
@@ -444,12 +461,12 @@ class MiwanzoState extends ChangeNotifier {
       notifyListeners();
       _logger.info(
         'MiwanzoState',
-        'Item de preferência atualizado (id=${item.id}).',
+        'Item de preferÃªncia atualizado (id=${item.id}).',
       );
     } catch (error, stackTrace) {
       _logger.error(
         'MiwanzoState',
-        'Falha ao atualizar item de preferência (id=${item.id}).',
+        'Falha ao atualizar item de preferÃªncia (id=${item.id}).',
         error: error,
         stackTrace: stackTrace,
       );
@@ -458,17 +475,17 @@ class MiwanzoState extends ChangeNotifier {
   }
 
   Future<void> deletePreferenceItem(int id) async {
-    _logger.info('MiwanzoState', 'Excluindo item de preferência (id=$id).');
+    _logger.info('MiwanzoState', 'Excluindo item de preferÃªncia (id=$id).');
 
     try {
       await _database.deletePreferenceItem(id);
       _preferenceItems.removeWhere((item) => item.id == id);
       notifyListeners();
-      _logger.info('MiwanzoState', 'Item de preferência excluído (id=$id).');
+      _logger.info('MiwanzoState', 'Item de preferÃªncia excluÃ­do (id=$id).');
     } catch (error, stackTrace) {
       _logger.error(
         'MiwanzoState',
-        'Falha ao excluir item de preferência (id=$id).',
+        'Falha ao excluir item de preferÃªncia (id=$id).',
         error: error,
         stackTrace: stackTrace,
       );
@@ -487,17 +504,17 @@ class MiwanzoState extends ChangeNotifier {
       createdAt: DateTime.now(),
     );
 
-    _logger.info('MiwanzoState', 'Salvando arquivo de midia "$path".');
+    _logger.info('MiwanzoState', 'Salvando arquivo de mídia "$path".');
 
     try {
       final insertedId = await _database.insertMediaEntry(entry);
       _mediaEntries.insert(0, entry.copyWith(id: insertedId));
       notifyListeners();
-      _logger.info('MiwanzoState', 'Arquivo de midia salvo (id=$insertedId).');
+      _logger.info('MiwanzoState', 'Arquivo de mídia salvo (id=$insertedId).');
     } catch (error, stackTrace) {
       _logger.error(
         'MiwanzoState',
-        'Falha ao salvar arquivo de midia.',
+        'Falha ao salvar arquivo de mídia.',
         error: error,
         stackTrace: stackTrace,
       );
@@ -506,17 +523,17 @@ class MiwanzoState extends ChangeNotifier {
   }
 
   Future<void> deleteMediaEntry(int id) async {
-    _logger.info('MiwanzoState', 'Excluindo arquivo de midia (id=$id).');
+    _logger.info('MiwanzoState', 'Excluindo arquivo de mídia (id=$id).');
 
     try {
       await _database.deleteMediaEntry(id);
       _mediaEntries.removeWhere((item) => item.id == id);
       notifyListeners();
-      _logger.info('MiwanzoState', 'Arquivo de midia excluido (id=$id).');
+      _logger.info('MiwanzoState', 'Arquivo de mídia excluído (id=$id).');
     } catch (error, stackTrace) {
       _logger.error(
         'MiwanzoState',
-        'Falha ao excluir arquivo de midia (id=$id).',
+        'Falha ao excluir arquivo de mídia (id=$id).',
         error: error,
         stackTrace: stackTrace,
       );

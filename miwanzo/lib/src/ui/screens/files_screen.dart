@@ -29,7 +29,7 @@ class FilesScreen extends StatelessWidget {
           children: [
             SectionTitle(
               title: 'Arquivos',
-              subtitle: 'Guarde fotos e videos em uma galeria privada.',
+              subtitle: 'Guarde fotos e vídeos em uma galeria privada.',
               trailing: FilledButton.icon(
                 onPressed: () => _openPicker(context),
                 icon: const Icon(Icons.add_photo_alternate_outlined),
@@ -38,9 +38,7 @@ class FilesScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             if (entries.isEmpty)
-              const GlassPanel(
-                child: Text('Nenhum arquivo adicionado ainda.'),
-              )
+              const GlassPanel(child: Text('Nenhum arquivo adicionado ainda.'))
             else
               GridView.builder(
                 itemCount: entries.length,
@@ -82,7 +80,7 @@ class FilesScreen extends StatelessWidget {
               ),
               ListTile(
                 leading: const Icon(Icons.video_library_outlined),
-                title: const Text('Selecionar video'),
+                title: const Text('Selecionar vídeo'),
                 onTap: () => Navigator.pop(sheetContext, MediaType.video),
               ),
             ],
@@ -113,14 +111,14 @@ class FilesScreen extends StatelessWidget {
     } catch (error, stackTrace) {
       _logger.error(
         'FilesScreen',
-        'Falha ao adicionar arquivo de midia.',
+        'Falha ao adicionar arquivo de mídia.',
         error: error,
         stackTrace: stackTrace,
       );
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Nao foi possivel adicionar o arquivo agora.'),
+            content: Text('Não foi possível adicionar o arquivo agora.'),
           ),
         );
       }
@@ -230,10 +228,7 @@ class _MediaTile extends StatelessWidget {
         alignment: Alignment.center,
         child: const Padding(
           padding: EdgeInsets.all(12),
-          child: Text(
-            'Arquivo nao encontrado',
-            textAlign: TextAlign.center,
-          ),
+          child: Text('Arquivo não encontrado', textAlign: TextAlign.center),
         ),
       );
     }
@@ -250,7 +245,7 @@ class _MediaTile extends StatelessWidget {
         children: const [
           Icon(Icons.play_circle_fill, size: 52),
           SizedBox(height: 8),
-          Text('Video'),
+          Text('Vídeo'),
         ],
       ),
     );
@@ -270,12 +265,10 @@ class _ImagePreviewDialog extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: file.existsSync()
-            ? InteractiveViewer(
-                child: Image.file(file, fit: BoxFit.contain),
-              )
+            ? InteractiveViewer(child: Image.file(file, fit: BoxFit.contain))
             : const Padding(
                 padding: EdgeInsets.all(20),
-                child: Text('Arquivo nao encontrado.'),
+                child: Text('Arquivo não encontrado.'),
               ),
       ),
     );
@@ -316,7 +309,7 @@ class _VideoPreviewDialogState extends State<_VideoPreviewDialog> {
     final initializeFuture = _initializeFuture;
 
     if (controller == null || initializeFuture == null) {
-      return const AlertDialog(content: Text('Arquivo nao encontrado.'));
+      return const AlertDialog(content: Text('Arquivo não encontrado.'));
     }
 
     return AlertDialog(

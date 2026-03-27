@@ -19,14 +19,13 @@ class ImportantDatesScreen extends StatelessWidget {
     return AnimatedBuilder(
       animation: state,
       builder: (context, _) {
-        final dates = state.upcomingDates;
-
+        final dates = state.allDatesForList;
         return ListView(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
           children: [
             SectionTitle(
               title: 'Datas Importantes',
-              subtitle: 'Cadastre momentos que voce nao quer esquecer.',
+              subtitle: 'Cadastre momentos que você não quer esquecer.',
               trailing: FilledButton.icon(
                 onPressed: () => _openDateForm(context),
                 icon: const Icon(Icons.add),
@@ -37,7 +36,7 @@ class ImportantDatesScreen extends StatelessWidget {
             if (dates.isEmpty)
               const GlassPanel(
                 child: Text(
-                  'Nenhuma data cadastrada ainda. Toque em "Adicionar" para comecar.',
+                  'Nenhuma data cadastrada ainda. Toque em "Adicionar" para começar.',
                 ),
               )
             else
@@ -63,22 +62,20 @@ class ImportantDatesScreen extends StatelessWidget {
   ) async {
     final shouldDelete = await showDialog<bool>(
       context: pageContext,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Excluir data?'),
-          content: Text('Tem certeza que deseja excluir "${date.title}"?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Excluir'),
-            ),
-          ],
-        );
-      },
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Excluir data?'),
+        content: Text('Tem certeza que deseja excluir "${date.title}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
     );
 
     if (shouldDelete ?? false) {
@@ -94,9 +91,6 @@ class ImportantDatesScreen extends StatelessWidget {
     final descriptionController = TextEditingController(
       text: existing?.description ?? '',
     );
-    final customDaysController = TextEditingController(
-      text: existing?.notifyCustomDays?.toString() ?? '',
-    );
     final formKey = GlobalKey<FormState>();
 
     var selectedDate =
@@ -109,12 +103,33 @@ class ImportantDatesScreen extends StatelessWidget {
         selectedDate.day,
       );
     }
-    var notify3Months = existing?.notify3Months ?? false;
-    var notify1Month = existing?.notify1Month ?? true;
-    var notify1Week = existing?.notify1Week ?? true;
-    var notify1Day = existing?.notify1Day ?? true;
-    var notifyOnDay = existing?.notifyOnDay ?? true;
-    var customEnabled = existing?.notifyCustomDays != null;
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    var notificationsEnabled =
+        existing?.hasAnyNotification ?? !selectedDate.isBefore(today);
+    var selectedNotificationTime = TimeOfDay(
+      hour: existing?.notificationHour ?? 9,
+      minute: existing?.notificationMinute ?? 0,
+    );
+
+    final defaultCustomDate = DateTime.now().add(const Duration(days: 1));
+    var customEnabled = existing?.notifyCustomDates.isNotEmpty ?? false;
+    var customNotificationDates = existing == null
+        ? <DateTime>[]
+        : List<DateTime>.from(existing.notifyCustomDates);
+    if (customEnabled && customNotificationDates.isEmpty) {
+      customNotificationDates.add(
+        DateTime(
+          defaultCustomDate.year,
+          defaultCustomDate.month,
+          defaultCustomDate.day,
+          selectedNotificationTime.hour,
+          selectedNotificationTime.minute,
+        ),
+      );
+    }
+
     var isSaving = false;
 
     await showModalBottomSheet<void>(
@@ -126,7 +141,6 @@ class ImportantDatesScreen extends StatelessWidget {
         return StatefulBuilder(
           builder: (sheetContext, setModalState) {
             final bottom = MediaQuery.viewInsetsOf(sheetContext).bottom;
-
             return Padding(
               padding: EdgeInsets.fromLTRB(16, 12, 16, bottom + 18),
               child: GlassPanel(
@@ -147,14 +161,12 @@ class ImportantDatesScreen extends StatelessWidget {
                           enabled: !isSaving,
                           decoration: const InputDecoration(
                             labelText: 'Nome da data',
-                            hintText: 'Ex: Aniversario',
+                            hintText: 'Ex: Aniversário',
                           ),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Informe o nome da data';
-                            }
-                            return null;
-                          },
+                          validator: (value) =>
+                              (value == null || value.trim().isEmpty)
+                              ? 'Informe o nome da data'
+                              : null,
                         ),
                         const SizedBox(height: 10),
                         TextFormField(
@@ -162,7 +174,7 @@ class ImportantDatesScreen extends StatelessWidget {
                           enabled: !isSaving,
                           maxLines: 3,
                           decoration: const InputDecoration(
-                            labelText: 'Anotacoes',
+                            labelText: 'Anotações',
                             hintText:
                                 'Detalhes importantes e links para lembrar depois',
                           ),
@@ -176,10 +188,9 @@ class ImportantDatesScreen extends StatelessWidget {
                                   final pickedDate = await showDatePicker(
                                     context: sheetContext,
                                     initialDate: selectedDate,
-                                    firstDate: DateTime(2000),
+                                    firstDate: DateTime(1900),
                                     lastDate: DateTime(2100),
                                   );
-
                                   if (pickedDate != null) {
                                     setModalState(() {
                                       selectedDate = repeatsAnnually
@@ -192,29 +203,13 @@ class ImportantDatesScreen extends StatelessWidget {
                                     });
                                   }
                                 },
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 14,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.88),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.calendar_month),
-                                const SizedBox(width: 10),
-                                Text(
-                                  repeatsAnnually
-                                      ? '${DateFormatters.friendlyDate(selectedDate)} (repete todo ano)'
-                                      : DateFormatters.friendlyDateWithYear(
-                                          selectedDate,
-                                        ),
-                                ),
-                              ],
-                            ),
+                          child: _pickerRow(
+                            Icons.calendar_month,
+                            repeatsAnnually
+                                ? '${DateFormatters.friendlyDate(selectedDate)} (repete todo ano)'
+                                : DateFormatters.friendlyDateWithYear(
+                                    selectedDate,
+                                  ),
                           ),
                         ),
                         const SizedBox(height: 10),
@@ -234,7 +229,7 @@ class ImportantDatesScreen extends StatelessWidget {
                                 }),
                           contentPadding: EdgeInsets.zero,
                           title: const Text('Repetir todos os anos'),
-                          subtitle: const Text('Usa somente dia e mes'),
+                          subtitle: const Text('Usa somente dia e mês'),
                           controlAffinity: ListTileControlAffinity.leading,
                         ),
                         const SizedBox(height: 8),
@@ -243,84 +238,217 @@ class ImportantDatesScreen extends StatelessWidget {
                           style: Theme.of(sheetContext).textTheme.titleMedium,
                         ),
                         const SizedBox(height: 8),
-                        CheckboxListTile(
-                          value: notify3Months,
+                        SwitchListTile(
+                          value: notificationsEnabled,
                           onChanged: isSaving
                               ? null
-                              : (value) => setModalState(
-                                  () => notify3Months = value ?? false,
+                              : (v) => setModalState(
+                                  () => notificationsEnabled = v,
                                 ),
                           contentPadding: EdgeInsets.zero,
-                          title: const Text('3 meses antes'),
-                          controlAffinity: ListTileControlAffinity.leading,
-                        ),
-                        CheckboxListTile(
-                          value: notify1Month,
-                          onChanged: isSaving
-                              ? null
-                              : (value) => setModalState(
-                                  () => notify1Month = value ?? false,
-                                ),
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('1 mes antes'),
-                          controlAffinity: ListTileControlAffinity.leading,
-                        ),
-                        CheckboxListTile(
-                          value: notify1Week,
-                          onChanged: isSaving
-                              ? null
-                              : (value) => setModalState(
-                                  () => notify1Week = value ?? false,
-                                ),
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('1 semana antes'),
-                          controlAffinity: ListTileControlAffinity.leading,
-                        ),
-                        CheckboxListTile(
-                          value: notify1Day,
-                          onChanged: isSaving
-                              ? null
-                              : (value) => setModalState(
-                                  () => notify1Day = value ?? false,
-                                ),
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('1 dia antes'),
-                          controlAffinity: ListTileControlAffinity.leading,
-                        ),
-                        CheckboxListTile(
-                          value: notifyOnDay,
-                          onChanged: isSaving
-                              ? null
-                              : (value) => setModalState(
-                                  () => notifyOnDay = value ?? false,
-                                ),
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('No dia'),
-                          controlAffinity: ListTileControlAffinity.leading,
-                        ),
-                        CheckboxListTile(
-                          value: customEnabled,
-                          onChanged: isSaving
-                              ? null
-                              : (value) => setModalState(
-                                  () => customEnabled = value ?? false,
-                                ),
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text(
-                            'Definir dias personalizados antes',
+                          title: const Text('Ativar notificações'),
+                          subtitle: const Text(
+                            'Padrão: 3 meses, 1 mês, 1 semana e 1 dia antes',
                           ),
-                          controlAffinity: ListTileControlAffinity.leading,
                         ),
-                        if (customEnabled)
-                          TextFormField(
-                            controller: customDaysController,
-                            enabled: !isSaving,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: 'Dias antes',
-                              hintText: 'Ex: 14',
+                        if (notificationsEnabled) ...[
+                          InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: isSaving
+                                ? null
+                                : () async {
+                                    final pickedTime = await showTimePicker(
+                                      context: sheetContext,
+                                      initialTime: selectedNotificationTime,
+                                    );
+                                    if (pickedTime != null) {
+                                      setModalState(
+                                        () => selectedNotificationTime =
+                                            pickedTime,
+                                      );
+                                    }
+                                  },
+                            child: _pickerRow(
+                              Icons.access_time,
+                              'Hora das notificações: ${DateFormatters.hourMinute(selectedNotificationTime.hour, selectedNotificationTime.minute)}',
                             ),
                           ),
+                          CheckboxListTile(
+                            value: customEnabled,
+                            onChanged: isSaving
+                                ? null
+                                : (v) => setModalState(() {
+                                    customEnabled = v ?? false;
+                                    if (customEnabled &&
+                                        customNotificationDates.isEmpty) {
+                                      customNotificationDates.add(
+                                        DateTime(
+                                          defaultCustomDate.year,
+                                          defaultCustomDate.month,
+                                          defaultCustomDate.day,
+                                          selectedNotificationTime.hour,
+                                          selectedNotificationTime.minute,
+                                        ),
+                                      );
+                                    }
+                                  }),
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text(
+                              'Definir datas personalizadas para notificar',
+                            ),
+                            subtitle: const Text(
+                              'Você pode adicionar mais de uma data',
+                            ),
+                            controlAffinity: ListTileControlAffinity.leading,
+                          ),
+                          if (customEnabled) ...[
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton.icon(
+                                onPressed: isSaving
+                                    ? null
+                                    : () => setModalState(() {
+                                        customNotificationDates.add(
+                                          DateTime(
+                                            defaultCustomDate.year,
+                                            defaultCustomDate.month,
+                                            defaultCustomDate.day,
+                                            selectedNotificationTime.hour,
+                                            selectedNotificationTime.minute,
+                                          ),
+                                        );
+                                        customNotificationDates =
+                                            _normalizeCustomNotificationDates(
+                                              customNotificationDates,
+                                            );
+                                      }),
+                                icon: const Icon(Icons.add_alert),
+                                label: const Text(
+                                  'Adicionar outra data personalizada',
+                                ),
+                              ),
+                            ),
+                            ...List.generate(customNotificationDates.length, (
+                              index,
+                            ) {
+                              final customAt = customNotificationDates[index];
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 10),
+                                padding: const EdgeInsets.fromLTRB(
+                                  12,
+                                  10,
+                                  12,
+                                  8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.7),
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Notificação personalizada ${index + 1}',
+                                      style: Theme.of(
+                                        sheetContext,
+                                      ).textTheme.titleSmall,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    InkWell(
+                                      borderRadius: BorderRadius.circular(12),
+                                      onTap: isSaving
+                                          ? null
+                                          : () async {
+                                              final pickedDate =
+                                                  await showDatePicker(
+                                                    context: sheetContext,
+                                                    initialDate: customAt,
+                                                    firstDate: DateTime(1900),
+                                                    lastDate: DateTime(2100),
+                                                  );
+                                              if (pickedDate != null) {
+                                                setModalState(() {
+                                                  customNotificationDates[index] =
+                                                      DateTime(
+                                                        pickedDate.year,
+                                                        pickedDate.month,
+                                                        pickedDate.day,
+                                                        customAt.hour,
+                                                        customAt.minute,
+                                                      );
+                                                  customNotificationDates =
+                                                      _normalizeCustomNotificationDates(
+                                                        customNotificationDates,
+                                                      );
+                                                });
+                                              }
+                                            },
+                                      child: _pickerRow(
+                                        Icons.event,
+                                        'Data: ${DateFormatters.friendlyDateWithYear(customAt)}',
+                                        margin: const EdgeInsets.only(
+                                          bottom: 8,
+                                        ),
+                                      ),
+                                    ),
+                                    InkWell(
+                                      borderRadius: BorderRadius.circular(12),
+                                      onTap: isSaving
+                                          ? null
+                                          : () async {
+                                              final pickedTime =
+                                                  await showTimePicker(
+                                                    context: sheetContext,
+                                                    initialTime: TimeOfDay(
+                                                      hour: customAt.hour,
+                                                      minute: customAt.minute,
+                                                    ),
+                                                  );
+                                              if (pickedTime != null) {
+                                                setModalState(() {
+                                                  customNotificationDates[index] =
+                                                      DateTime(
+                                                        customAt.year,
+                                                        customAt.month,
+                                                        customAt.day,
+                                                        pickedTime.hour,
+                                                        pickedTime.minute,
+                                                      );
+                                                  customNotificationDates =
+                                                      _normalizeCustomNotificationDates(
+                                                        customNotificationDates,
+                                                      );
+                                                });
+                                              }
+                                            },
+                                      child: _pickerRow(
+                                        Icons.schedule,
+                                        'Hora: ${DateFormatters.hourMinute(customAt.hour, customAt.minute)}',
+                                      ),
+                                    ),
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: TextButton.icon(
+                                        onPressed: isSaving
+                                            ? null
+                                            : () => setModalState(() {
+                                                customNotificationDates
+                                                    .removeAt(index);
+                                                if (customNotificationDates
+                                                    .isEmpty) {
+                                                  customEnabled = false;
+                                                }
+                                              }),
+                                        icon: const Icon(Icons.delete_outline),
+                                        label: const Text('Remover'),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }),
+                          ],
+                        ],
                         const SizedBox(height: 18),
                         Row(
                           children: [
@@ -343,51 +471,15 @@ class ImportantDatesScreen extends StatelessWidget {
                                             false)) {
                                           return;
                                         }
-
-                                        final customDays = customEnabled
-                                            ? int.tryParse(
-                                                customDaysController.text
-                                                    .trim(),
-                                              )
-                                            : null;
-
-                                        if (customEnabled &&
-                                            (customDays == null ||
-                                                customDays <= 0)) {
-                                          ScaffoldMessenger.of(
-                                            pageContext,
-                                          ).showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                'Informe um numero valido de dias para notificacao personalizada.',
-                                              ),
-                                            ),
-                                          );
-                                          return;
-                                        }
-
-                                        final hasNotification =
-                                            notify3Months ||
-                                            notify1Month ||
-                                            notify1Week ||
-                                            notify1Day ||
-                                            notifyOnDay ||
-                                            customDays != null;
-
-                                        if (!hasNotification) {
-                                          ScaffoldMessenger.of(
-                                            pageContext,
-                                          ).showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                'Selecione pelo menos uma regra de notificacao.',
-                                              ),
-                                            ),
-                                          );
-                                          return;
-                                        }
-
                                         setModalState(() => isSaving = true);
+
+                                        final customNotifyDates =
+                                            notificationsEnabled &&
+                                                customEnabled
+                                            ? _normalizeCustomNotificationDates(
+                                                customNotificationDates,
+                                              )
+                                            : const <DateTime>[];
 
                                         try {
                                           if (existing == null) {
@@ -398,13 +490,16 @@ class ImportantDatesScreen extends StatelessWidget {
                                                   .text
                                                   .trim(),
                                               date: selectedDate,
+                                              notificationHour:
+                                                  selectedNotificationTime.hour,
+                                              notificationMinute:
+                                                  selectedNotificationTime
+                                                      .minute,
                                               repeatsAnnually: repeatsAnnually,
-                                              notify3Months: notify3Months,
-                                              notify1Month: notify1Month,
-                                              notify1Week: notify1Week,
-                                              notify1Day: notify1Day,
-                                              notifyOnDay: notifyOnDay,
-                                              notifyCustomDays: customDays,
+                                              notificationsEnabled:
+                                                  notificationsEnabled,
+                                              notifyCustomDates:
+                                                  customNotifyDates,
                                             );
                                           } else {
                                             await state.updateImportantDate(
@@ -415,27 +510,38 @@ class ImportantDatesScreen extends StatelessWidget {
                                                     descriptionController.text
                                                         .trim(),
                                                 date: selectedDate,
+                                                notificationHour:
+                                                    selectedNotificationTime
+                                                        .hour,
+                                                notificationMinute:
+                                                    selectedNotificationTime
+                                                        .minute,
                                                 repeatsAnnually:
                                                     repeatsAnnually,
-                                                notify3Months: notify3Months,
-                                                notify1Month: notify1Month,
-                                                notify1Week: notify1Week,
-                                                notify1Day: notify1Day,
-                                                notifyOnDay: notifyOnDay,
-                                                notifyCustomDays: customDays,
-                                                clearCustomDays: !customEnabled,
+                                                notify3Months:
+                                                    notificationsEnabled,
+                                                notify1Month:
+                                                    notificationsEnabled,
+                                                notify1Week:
+                                                    notificationsEnabled,
+                                                notify1Day:
+                                                    notificationsEnabled,
+                                                notifyOnDay: false,
+                                                notifyCustomDates:
+                                                    customNotifyDates,
+                                                clearCustomDates:
+                                                    !notificationsEnabled ||
+                                                    !customEnabled,
                                               ),
                                             );
                                           }
-
                                           if (sheetContext.mounted) {
                                             Navigator.of(sheetContext).pop();
-                                            return;
                                           }
                                         } on DuplicateImportantDateException {
                                           _logger.warning(
                                             'ImportantDatesScreen',
-                                            'Cadastro/edicao bloqueado por duplicidade de titulo + data.',
+                                            'Cadastro/edição bloqueado por duplicidade de título + data.',
                                           );
                                           if (pageContext.mounted) {
                                             ScaffoldMessenger.of(
@@ -443,7 +549,7 @@ class ImportantDatesScreen extends StatelessWidget {
                                             ).showSnackBar(
                                               const SnackBar(
                                                 content: Text(
-                                                  'Ja existe uma data importante com o mesmo nome e a mesma data.',
+                                                  'Já existe uma data importante com o mesmo nome e a mesma data.',
                                                 ),
                                               ),
                                             );
@@ -461,7 +567,7 @@ class ImportantDatesScreen extends StatelessWidget {
                                             ).showSnackBar(
                                               const SnackBar(
                                                 content: Text(
-                                                  'Nao foi possivel salvar a data agora. Tente novamente.',
+                                                  'Não foi possível salvar a data agora. Tente novamente.',
                                                 ),
                                               ),
                                             );
@@ -503,7 +609,36 @@ class ImportantDatesScreen extends StatelessWidget {
     await Future<void>.delayed(const Duration(milliseconds: 300));
     titleController.dispose();
     descriptionController.dispose();
-    customDaysController.dispose();
+  }
+
+  List<DateTime> _normalizeCustomNotificationDates(Iterable<DateTime> values) {
+    final unique = <int, DateTime>{};
+    for (final value in values) {
+      unique[value.millisecondsSinceEpoch] = value;
+    }
+
+    final sorted = unique.values.toList(growable: false)
+      ..sort((a, b) => a.compareTo(b));
+    return sorted;
+  }
+
+  Widget _pickerRow(IconData icon, String text, {EdgeInsets? margin}) {
+    return Container(
+      width: double.infinity,
+      margin: margin,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.88),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Icon(icon),
+          const SizedBox(width: 10),
+          Expanded(child: Text(text)),
+        ],
+      ),
+    );
   }
 }
 
@@ -520,8 +655,7 @@ class _ImportantDateCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final labels = _notificationLabels(date);
-    final days = date.daysUntilNextOccurrence;
+    final nextNotification = _nextNotification(date);
 
     return GlassPanel(
       child: Column(
@@ -556,13 +690,7 @@ class _ImportantDateCard extends StatelessWidget {
                 ),
               ),
               PopupMenuButton<String>(
-                onSelected: (value) {
-                  if (value == 'edit') {
-                    onEdit();
-                  } else {
-                    onDelete();
-                  }
-                },
+                onSelected: (value) => value == 'edit' ? onEdit() : onDelete(),
                 itemBuilder: (context) => const [
                   PopupMenuItem(value: 'edit', child: Text('Editar')),
                   PopupMenuItem(value: 'delete', child: Text('Excluir')),
@@ -577,9 +705,20 @@ class _ImportantDateCard extends StatelessWidget {
             children: [
               Chip(
                 avatar: const Icon(Icons.schedule, size: 16),
-                label: Text(_daysLabel(days)),
+                label: Text(_daysLabel(date)),
               ),
-              ...labels.map((label) => Chip(label: Text(label))),
+              if (nextNotification != null)
+                Chip(
+                  avatar: const Icon(Icons.notifications_active, size: 16),
+                  label: Text(
+                    'Próxima notificação: ${DateFormatters.fullDateTime(nextNotification)}',
+                  ),
+                )
+              else
+                const Chip(
+                  avatar: Icon(Icons.notifications_off, size: 16),
+                  label: Text('Sem notificações futuras'),
+                ),
             ],
           ),
         ],
@@ -587,26 +726,93 @@ class _ImportantDateCard extends StatelessWidget {
     );
   }
 
-  String _daysLabel(int days) {
+  String _daysLabel(ImportantDate date) {
+    if (date.isPastNonRepeating) return 'Data passada';
+    final days = date.daysUntilNextOccurrence;
     if (days == 0) return 'Hoje';
-    if (days == 1) return 'Amanha';
-    if (days < 0) return 'Ha ${days.abs()} dias';
+    if (days == 1) return 'Amanhã';
+    if (days < 0) return 'Há ${days.abs()} dias';
     return 'Em $days dias';
   }
 
-  List<String> _notificationLabels(ImportantDate date) {
-    final labels = <String>[];
+  DateTime? _nextNotification(ImportantDate date) {
+    final now = DateTime.now();
+    final minTrigger = now.add(const Duration(minutes: 1));
+    final candidates = <DateTime>[];
 
-    if (date.notify3Months) labels.add('3 meses antes');
-    if (date.notify1Month) labels.add('1 mes antes');
-    if (date.notify1Week) labels.add('1 semana antes');
-    if (date.notify1Day) labels.add('1 dia antes');
-    if (date.notifyOnDay) labels.add('No dia');
-    if (date.notifyCustomDays != null) {
-      labels.add('${date.notifyCustomDays} dias antes');
+    void addRelative({required int months, required int days}) {
+      if (!date.repeatsAnnually) {
+        final occurrence = DateTime(
+          date.date.year,
+          date.date.month,
+          date.date.day,
+          date.notificationHour,
+          date.notificationMinute,
+        );
+        final trigger = _applyOffset(occurrence, months: months, days: days);
+        if (trigger.isAfter(minTrigger)) candidates.add(trigger);
+        return;
+      }
+
+      for (var delta = 0; delta <= 3; delta++) {
+        final year = now.year + delta;
+        final occurrence = _safeDate(
+          year,
+          date.date.month,
+          date.date.day,
+          date.notificationHour,
+          date.notificationMinute,
+        );
+        final trigger = _applyOffset(occurrence, months: months, days: days);
+        if (trigger.isAfter(minTrigger)) {
+          candidates.add(trigger);
+          break;
+        }
+      }
     }
 
-    return labels;
+    if (date.notify3Months) addRelative(months: 3, days: 0);
+    if (date.notify1Month) addRelative(months: 1, days: 0);
+    if (date.notify1Week) addRelative(months: 0, days: 7);
+    if (date.notify1Day) addRelative(months: 0, days: 1);
+    if (date.notifyOnDay) addRelative(months: 0, days: 0);
+
+    for (final customAt in date.notifyCustomDates) {
+      if (customAt.isAfter(minTrigger)) candidates.add(customAt);
+    }
+
+    if (candidates.isEmpty) return null;
+    candidates.sort();
+    return candidates.first;
+  }
+
+  DateTime _applyOffset(
+    DateTime occurrence, {
+    required int months,
+    required int days,
+  }) {
+    if (months > 0) {
+      final totalMonths =
+          (occurrence.year * 12 + (occurrence.month - 1)) - months;
+      final targetYear = totalMonths ~/ 12;
+      final targetMonth = totalMonths % 12 + 1;
+      final maxDay = DateTime(targetYear, targetMonth + 1, 0).day;
+      final targetDay = occurrence.day > maxDay ? maxDay : occurrence.day;
+      return DateTime(
+        targetYear,
+        targetMonth,
+        targetDay,
+        occurrence.hour,
+        occurrence.minute,
+      );
+    }
+    return occurrence.subtract(Duration(days: days));
+  }
+
+  DateTime _safeDate(int year, int month, int day, int hour, int minute) {
+    final maxDay = DateTime(year, month + 1, 0).day;
+    final safeDay = day > maxDay ? maxDay : day;
+    return DateTime(year, month, safeDay, hour, minute);
   }
 }
 
@@ -626,7 +832,6 @@ class _LinkAwareText extends StatelessWidget {
     if (raw.isEmpty) return const SizedBox.shrink();
 
     final links = _extractLinks(raw);
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -661,9 +866,8 @@ class _LinkAwareText extends StatelessWidget {
     return found.toList(growable: false);
   }
 
-  String _sanitizeLink(String link) {
-    return link.replaceAll(RegExp(r'[.,;:!?)\]}]+$'), '');
-  }
+  String _sanitizeLink(String link) =>
+      link.replaceAll(RegExp(r'[.,;:!?)\]}]+$'), '');
 
   String _chipLabel(String link) {
     const maxLength = 36;
@@ -676,18 +880,17 @@ class _LinkAwareText extends StatelessWidget {
         ? link
         : 'https://$link';
     final uri = Uri.tryParse(withScheme);
-
     if (uri == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Link invalido.')));
+      ).showSnackBar(const SnackBar(content: Text('Link inválido.')));
       return;
     }
 
     final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!opened && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nao foi possivel abrir o link.')),
+        const SnackBar(content: Text('Não foi possível abrir o link.')),
       );
     }
   }

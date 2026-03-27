@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../state/miwanzo_state.dart';
@@ -50,7 +50,7 @@ class _RootShellState extends State<RootShell> {
       animation: _state,
       builder: (context, _) {
         final pages = [
-          DashboardScreen(state: _state, onOpenSection: _openSection),
+          DashboardScreen(state: _state),
           ImportantDatesScreen(state: _state),
           NotesScreen(state: _state),
           PreferencesScreen(state: _state),
@@ -61,7 +61,9 @@ class _RootShellState extends State<RootShell> {
         final isReady = !_state.isLoading && _state.errorMessage == null;
         if (isReady && !_didCheckUpdates) {
           _didCheckUpdates = true;
-          WidgetsBinding.instance.addPostFrameCallback((_) => _checkForUpdates());
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => _checkForUpdates(),
+          );
         }
 
         Widget content;
@@ -111,10 +113,7 @@ class _RootShellState extends State<RootShell> {
                 SafeArea(
                   bottom: false,
                   child: isReady
-                      ? IndexedStack(
-                          index: _currentIndex,
-                          children: pages,
-                        )
+                      ? IndexedStack(index: _currentIndex, children: pages)
                       : content,
                 ),
               ],
@@ -130,7 +129,7 @@ class _RootShellState extends State<RootShell> {
                       NavigationDestination(
                         icon: Icon(Icons.home_outlined),
                         selectedIcon: Icon(Icons.home),
-                        label: 'Inicio',
+                        label: 'Início',
                       ),
                       NavigationDestination(
                         icon: Icon(Icons.event_note_outlined),
@@ -174,11 +173,11 @@ class _RootShellState extends State<RootShell> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Nova versao disponivel'),
+          title: const Text('Nova versão disponível'),
           content: Text(
-            'Versao atual: ${update.currentVersion}\n'
-            'Nova versao: ${update.latestVersion}\n\n'
-            'Deseja baixar a atualizacao agora?',
+            'Versão atual: ${update.currentVersion}\n'
+            'Nova versão: ${update.latestVersion}\n\n'
+            'Deseja baixar a atualização agora?',
           ),
           actions: [
             TextButton(
@@ -201,7 +200,7 @@ class _RootShellState extends State<RootShell> {
     if (!opened && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Nao foi possivel abrir o link de atualizacao.'),
+          content: Text('Não foi possível abrir o link de atualização.'),
         ),
       );
     }

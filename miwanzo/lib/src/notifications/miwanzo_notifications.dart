@@ -17,6 +17,9 @@ class MiwanzoNotifications {
   static const String _channelName = 'Datas importantes';
   static const String _channelDescription =
       'Lembretes locais para datas importantes do Miwanzo.';
+  static const int _customRuleStartCode = 6;
+  static const int _idBlockSize = 10000;
+  static const int _maxCustomRules = _idBlockSize - _customRuleStartCode;
 
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
@@ -77,7 +80,7 @@ class MiwanzoNotifications {
     final rules = _buildRules(date);
 
     for (final rule in rules) {
-      final nextTrigger = _computeNextTrigger(date, rule.offset);
+      final nextTrigger = _computeNextTrigger(date, rule);
       if (nextTrigger == null) continue;
 
       await _plugin.zonedSchedule(
@@ -105,8 +108,15 @@ class MiwanzoNotifications {
 
     await initialize();
 
-    for (final code in _ruleCodes) {
-      await _plugin.cancel(_notificationId(importantDateId, code));
+    final payloadPrefix = 'important_date:$importantDateId';
+    final requests = await _plugin.pendingNotificationRequests();
+
+    for (final request in requests) {
+      final payload = request.payload;
+      if (payload == payloadPrefix ||
+          payload?.startsWith('$payloadPrefix:') == true) {
+        await _plugin.cancel(request.id);
+      }
     }
   }
 
@@ -173,12 +183,17 @@ class MiwanzoNotifications {
       );
     }
 
-    if (date.notifyCustomDays case final customDays?) {
+    for (
+      var index = 0;
+      index < date.notifyCustomDates.length && index < _maxCustomRules;
+      index++
+    ) {
+      final customAt = date.notifyCustomDates[index];
       rules.add(
         _RuleNotification(
-          code: 6,
-          offset: _RelativeOffset.days(customDays),
-          title: '$title em $customDays dias',
+          code: _customRuleStartCode + index,
+          absoluteAt: customAt,
+          title: 'Lembrete personalizado: $title',
           body: body,
         ),
       );
@@ -189,16 +204,32 @@ class MiwanzoNotifications {
 
   tz.TZDateTime? _computeNextTrigger(
     ImportantDate date,
-    _RelativeOffset offset,
+    _RuleNotification rule,
   ) {
     final now = tz.TZDateTime.now(tz.local);
+
+    if (rule.absoluteAt case final absoluteAt?) {
+      final trigger = tz.TZDateTime.from(absoluteAt, tz.local);
+      if (trigger.isAfter(now.add(const Duration(minutes: 1)))) {
+        return trigger;
+      }
+      return null;
+    }
+
+    final offset = rule.offset;
+    if (offset == null) return null;
+
     final baseDate = date.date;
+    final hour = date.notificationHour;
+    final minute = date.notificationMinute;
 
     if (!date.repeatsAnnually) {
       final oneTimeOccurrence = _safeDate(
         baseDate.year,
         baseDate.month,
         baseDate.day,
+        hour,
+        minute,
       );
       final trigger = _applyOffset(oneTimeOccurrence, offset);
       if (trigger.isAfter(now.add(const Duration(minutes: 1)))) {
@@ -212,7 +243,7 @@ class MiwanzoNotifications {
 
     for (var yearDelta = 0; yearDelta <= 3; yearDelta++) {
       final year = now.year + yearDelta;
-      final occurrence = _safeDate(year, eventMonth, eventDay);
+      final occurrence = _safeDate(year, eventMonth, eventDay, hour, minute);
       final trigger = _applyOffset(occurrence, offset);
 
       if (trigger.isAfter(now.add(const Duration(minutes: 1)))) {
@@ -238,33 +269,40 @@ class MiwanzoNotifications {
     final maxDay = DateTime(targetYear, targetMonth + 1, 0).day;
     final targetDay = date.day > maxDay ? maxDay : date.day;
 
-    return tz.TZDateTime(tz.local, targetYear, targetMonth, targetDay, 9);
+    return tz.TZDateTime(
+      tz.local,
+      targetYear,
+      targetMonth,
+      targetDay,
+      date.hour,
+      date.minute,
+    );
   }
 
-  tz.TZDateTime _safeDate(int year, int month, int day) {
+  tz.TZDateTime _safeDate(int year, int month, int day, int hour, int minute) {
     final maxDay = DateTime(year, month + 1, 0).day;
     final safeDay = day > maxDay ? maxDay : day;
 
-    return tz.TZDateTime(tz.local, year, month, safeDay, 9);
+    return tz.TZDateTime(tz.local, year, month, safeDay, hour, minute);
   }
 
   int _notificationId(int importantDateId, int code) {
-    return importantDateId * 100 + code;
+    return importantDateId * _idBlockSize + code;
   }
-
-  List<int> get _ruleCodes => const [1, 2, 3, 4, 5, 6];
 }
 
 class _RuleNotification {
   const _RuleNotification({
     required this.code,
-    required this.offset,
+    this.offset,
+    this.absoluteAt,
     required this.title,
     required this.body,
   });
 
   final int code;
-  final _RelativeOffset offset;
+  final _RelativeOffset? offset;
+  final DateTime? absoluteAt;
   final String title;
   final String body;
 }

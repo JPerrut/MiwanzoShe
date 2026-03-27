@@ -25,8 +25,8 @@ class NotesScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
           children: [
             SectionTitle(
-              title: 'Anotações',
-              subtitle: 'Registre detalhes, ideias e lembretes úteis.',
+              title: 'AnotaÃ§Ãµes',
+              subtitle: 'Registre detalhes, ideias e lembretes Ãºteis.',
               trailing: FilledButton.icon(
                 onPressed: () => _openNoteForm(context),
                 icon: const Icon(Icons.add),
@@ -35,7 +35,7 @@ class NotesScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             if (notes.isEmpty)
-              const GlassPanel(child: Text('Você ainda não criou notas.'))
+              const GlassPanel(child: Text('VocÃª ainda nÃ£o criou notas.'))
             else
               ...notes.map(
                 (note) => Padding(
@@ -119,12 +119,12 @@ class NotesScreen extends StatelessWidget {
                           controller: titleController,
                           enabled: !isSaving,
                           decoration: const InputDecoration(
-                            labelText: 'Título',
+                            labelText: 'TÃ­tulo',
                             hintText: 'Ex: Ideias para presente',
                           ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
-                              return 'Informe o título da nota';
+                              return 'Informe o tÃ­tulo da nota';
                             }
                             return null;
                           },
@@ -135,12 +135,12 @@ class NotesScreen extends StatelessWidget {
                           enabled: !isSaving,
                           maxLines: 4,
                           decoration: const InputDecoration(
-                            labelText: 'Descrição',
+                            labelText: 'DescriÃ§Ã£o',
                             hintText: 'Escreva os detalhes importantes...',
                           ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
-                              return 'Informe a descrição';
+                              return 'Informe a descriÃ§Ã£o';
                             }
                             return null;
                           },
@@ -214,7 +214,7 @@ class NotesScreen extends StatelessWidget {
                                         } catch (error, stackTrace) {
                                           _logger.error(
                                             'NotesScreen',
-                                            'Falha ao salvar nota via formulário.',
+                                            'Falha ao salvar nota via formulÃ¡rio.',
                                             error: error,
                                             stackTrace: stackTrace,
                                           );
@@ -224,7 +224,7 @@ class NotesScreen extends StatelessWidget {
                                             ).showSnackBar(
                                               const SnackBar(
                                                 content: Text(
-                                                  'Não foi possível salvar a nota agora. Tente novamente.',
+                                                  'NÃ£o foi possÃ­vel salvar a nota agora. Tente novamente.',
                                                 ),
                                               ),
                                             );
@@ -312,7 +312,7 @@ class _NoteCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            '#${note.tag} · ${DateFormatters.fullDate(note.createdAt)}',
+            '#${note.tag} Â· ${DateFormatters.fullDate(note.createdAt)}',
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 10),
@@ -393,14 +393,14 @@ class _LinkAwareText extends StatelessWidget {
     if (uri == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Link invalido.')));
+      ).showSnackBar(const SnackBar(content: Text('Link inválido.')));
       return;
     }
 
     final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!opened && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nao foi possivel abrir o link.')),
+        const SnackBar(content: Text('Não foi possível abrir o link.')),
       );
     }
   }
