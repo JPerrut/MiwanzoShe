@@ -25,8 +25,8 @@ class NotesScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
           children: [
             SectionTitle(
-              title: 'AnotaÃ§Ãµes',
-              subtitle: 'Registre detalhes, ideias e lembretes Ãºteis.',
+              title: 'Anotações',
+              subtitle: 'Registre detalhes, ideias e lembretes úteis.',
               trailing: FilledButton.icon(
                 onPressed: () => _openNoteForm(context),
                 icon: const Icon(Icons.add),
@@ -35,7 +35,7 @@ class NotesScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             if (notes.isEmpty)
-              const GlassPanel(child: Text('VocÃª ainda nÃ£o criou notas.'))
+              const GlassPanel(child: Text('Você ainda não criou notas.'))
             else
               ...notes.map(
                 (note) => Padding(
@@ -119,12 +119,12 @@ class NotesScreen extends StatelessWidget {
                           controller: titleController,
                           enabled: !isSaving,
                           decoration: const InputDecoration(
-                            labelText: 'TÃ­tulo',
+                            labelText: 'Título',
                             hintText: 'Ex: Ideias para presente',
                           ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
-                              return 'Informe o tÃ­tulo da nota';
+                              return 'Informe o título da nota';
                             }
                             return null;
                           },
@@ -135,12 +135,12 @@ class NotesScreen extends StatelessWidget {
                           enabled: !isSaving,
                           maxLines: 4,
                           decoration: const InputDecoration(
-                            labelText: 'DescriÃ§Ã£o',
+                            labelText: 'Descrição',
                             hintText: 'Escreva os detalhes importantes...',
                           ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
-                              return 'Informe a descriÃ§Ã£o';
+                              return 'Informe a descrição';
                             }
                             return null;
                           },
@@ -214,7 +214,7 @@ class NotesScreen extends StatelessWidget {
                                         } catch (error, stackTrace) {
                                           _logger.error(
                                             'NotesScreen',
-                                            'Falha ao salvar nota via formulÃ¡rio.',
+                                            'Falha ao salvar nota via formulário.',
                                             error: error,
                                             stackTrace: stackTrace,
                                           );
@@ -224,7 +224,7 @@ class NotesScreen extends StatelessWidget {
                                             ).showSnackBar(
                                               const SnackBar(
                                                 content: Text(
-                                                  'NÃ£o foi possÃ­vel salvar a nota agora. Tente novamente.',
+                                                  'Não foi possível salvar a nota agora. Tente novamente.',
                                                 ),
                                               ),
                                             );
@@ -312,7 +312,7 @@ class _NoteCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            '#${note.tag} Â· ${DateFormatters.fullDate(note.createdAt)}',
+            '#${note.tag} · ${DateFormatters.fullDate(note.createdAt)}',
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 10),

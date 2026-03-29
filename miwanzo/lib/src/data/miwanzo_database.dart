@@ -17,7 +17,7 @@ class MiwanzoDatabase {
   static final MiwanzoDatabase instance = MiwanzoDatabase._();
 
   static const String _databaseName = 'miwanzo.db';
-  static const int _databaseVersion = 6;
+  static const int _databaseVersion = 7;
 
   static const List<String> _defaultCategories = [
     'Comidas',
@@ -99,6 +99,7 @@ class MiwanzoDatabase {
         notificacao_1_semana INTEGER NOT NULL DEFAULT 0,
         notificacao_1_dia INTEGER NOT NULL DEFAULT 0,
         notificacao_no_dia INTEGER NOT NULL DEFAULT 0,
+        notificacao_som TEXT NOT NULL DEFAULT 'default',
         notificacao_personalizada_dias INTEGER,
         notificacao_personalizada_data TEXT
       )
@@ -200,6 +201,13 @@ class MiwanzoDatabase {
       await db.execute('''
         ALTER TABLE datas_importantes
         ADD COLUMN notificacao_personalizada_data TEXT
+      ''');
+    }
+
+    if (oldVersion < 7) {
+      await db.execute('''
+        ALTER TABLE datas_importantes
+        ADD COLUMN notificacao_som TEXT NOT NULL DEFAULT 'default'
       ''');
     }
   }

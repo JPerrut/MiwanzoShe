@@ -112,6 +112,8 @@ class ImportantDatesScreen extends StatelessWidget {
       hour: existing?.notificationHour ?? 9,
       minute: existing?.notificationMinute ?? 0,
     );
+    var selectedNotificationSound =
+        existing?.notificationSound ?? ImportantDate.notificationSoundDefault;
 
     final defaultCustomDate = DateTime.now().add(const Duration(days: 1));
     var customEnabled = existing?.notifyCustomDates.isNotEmpty ?? false;
@@ -272,6 +274,31 @@ class ImportantDatesScreen extends StatelessWidget {
                               Icons.access_time,
                               'Hora das notificações: ${DateFormatters.hourMinute(selectedNotificationTime.hour, selectedNotificationTime.minute)}',
                             ),
+                          ),
+                          const SizedBox(height: 10),
+                          DropdownButtonFormField<String>(
+                            initialValue: selectedNotificationSound,
+                            decoration: const InputDecoration(
+                              labelText: 'Som da notificação',
+                            ),
+                            items: const [
+                              DropdownMenuItem(
+                                value: ImportantDate.notificationSoundDefault,
+                                child: Text('Padrão do sistema'),
+                              ),
+                              DropdownMenuItem(
+                                value: ImportantDate.notificationSoundMiwanzo,
+                                child: Text('Som Miwanzo'),
+                              ),
+                            ],
+                            onChanged: isSaving
+                                ? null
+                                : (value) {
+                                    if (value == null) return;
+                                    setModalState(
+                                      () => selectedNotificationSound = value,
+                                    );
+                                  },
                           ),
                           CheckboxListTile(
                             value: customEnabled,
@@ -498,6 +525,8 @@ class ImportantDatesScreen extends StatelessWidget {
                                               repeatsAnnually: repeatsAnnually,
                                               notificationsEnabled:
                                                   notificationsEnabled,
+                                              notificationSound:
+                                                  selectedNotificationSound,
                                               notifyCustomDates:
                                                   customNotifyDates,
                                             );
@@ -527,6 +556,8 @@ class ImportantDatesScreen extends StatelessWidget {
                                                 notify1Day:
                                                     notificationsEnabled,
                                                 notifyOnDay: false,
+                                                notificationSound:
+                                                    selectedNotificationSound,
                                                 notifyCustomDates:
                                                     customNotifyDates,
                                                 clearCustomDates:
@@ -614,7 +645,8 @@ class ImportantDatesScreen extends StatelessWidget {
   List<DateTime> _normalizeCustomNotificationDates(Iterable<DateTime> values) {
     final unique = <int, DateTime>{};
     for (final value in values) {
-      unique[value.millisecondsSinceEpoch] = value;
+      final normalized = value.isUtc ? value.toLocal() : value;
+      unique[normalized.millisecondsSinceEpoch] = normalized;
     }
 
     final sorted = unique.values.toList(growable: false)
@@ -778,7 +810,10 @@ class _ImportantDateCard extends StatelessWidget {
     if (date.notifyOnDay) addRelative(months: 0, days: 0);
 
     for (final customAt in date.notifyCustomDates) {
-      if (customAt.isAfter(minTrigger)) candidates.add(customAt);
+      final normalizedCustomAt = customAt.isUtc ? customAt.toLocal() : customAt;
+      if (normalizedCustomAt.isAfter(minTrigger)) {
+        candidates.add(normalizedCustomAt);
+      }
     }
 
     if (candidates.isEmpty) return null;

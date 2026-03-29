@@ -1,6 +1,13 @@
 import 'dart:convert';
 
 class ImportantDate {
+  static const String notificationSoundDefault = 'default';
+  static const String notificationSoundMiwanzo = 'miwanzo_tone';
+  static const List<String> supportedNotificationSounds = [
+    notificationSoundDefault,
+    notificationSoundMiwanzo,
+  ];
+
   ImportantDate({
     required this.id,
     required this.title,
@@ -14,8 +21,10 @@ class ImportantDate {
     required this.notify1Week,
     required this.notify1Day,
     required this.notifyOnDay,
+    String notificationSound = notificationSoundDefault,
     List<DateTime> notifyCustomDates = const [],
-  }) : notifyCustomDates = _normalizeCustomDates(notifyCustomDates);
+  }) : notificationSound = _normalizeNotificationSound(notificationSound),
+       notifyCustomDates = _normalizeCustomDates(notifyCustomDates);
 
   final int id;
   final String title;
@@ -30,6 +39,7 @@ class ImportantDate {
   final bool notify1Week;
   final bool notify1Day;
   final bool notifyOnDay;
+  final String notificationSound;
   final List<DateTime> notifyCustomDates;
 
   DateTime? get notifyCustomAt =>
@@ -88,6 +98,7 @@ class ImportantDate {
     bool? notify1Week,
     bool? notify1Day,
     bool? notifyOnDay,
+    String? notificationSound,
     List<DateTime>? notifyCustomDates,
     bool clearCustomDates = false,
   }) {
@@ -104,6 +115,7 @@ class ImportantDate {
       notify1Week: notify1Week ?? this.notify1Week,
       notify1Day: notify1Day ?? this.notify1Day,
       notifyOnDay: notifyOnDay ?? this.notifyOnDay,
+      notificationSound: notificationSound ?? this.notificationSound,
       notifyCustomDates: clearCustomDates
           ? const []
           : (notifyCustomDates ?? this.notifyCustomDates),
@@ -123,6 +135,7 @@ class ImportantDate {
       'notificacao_1_semana': notify1Week ? 1 : 0,
       'notificacao_1_dia': notify1Day ? 1 : 0,
       'notificacao_no_dia': notifyOnDay ? 1 : 0,
+      'notificacao_som': notificationSound,
       'notificacao_personalizada_data': _encodeCustomDates(notifyCustomDates),
     };
 
@@ -139,6 +152,9 @@ class ImportantDate {
     );
     final hour = ((map['notificacao_hora'] as num?) ?? 9).toInt();
     final minute = ((map['notificacao_minuto'] as num?) ?? 0).toInt();
+    final sound = _normalizeNotificationSound(
+      (map['notificacao_som'] as String?) ?? notificationSoundDefault,
+    );
     final customAtRaw = map['notificacao_personalizada_data'] as String?;
     final legacyCustomDays = (map['notificacao_personalizada_dias'] as num?)
         ?.toInt();
@@ -170,6 +186,7 @@ class ImportantDate {
       notify1Week: ((map['notificacao_1_semana'] as num?) ?? 0).toInt() == 1,
       notify1Day: ((map['notificacao_1_dia'] as num?) ?? 0).toInt() == 1,
       notifyOnDay: ((map['notificacao_no_dia'] as num?) ?? 0).toInt() == 1,
+      notificationSound: sound,
       notifyCustomDates: customDates,
     );
   }
@@ -220,12 +237,20 @@ class ImportantDate {
   static List<DateTime> _normalizeCustomDates(Iterable<DateTime> values) {
     final unique = <int, DateTime>{};
     for (final value in values) {
-      unique[value.millisecondsSinceEpoch] = value;
+      final normalized = value.isUtc ? value.toLocal() : value;
+      unique[normalized.millisecondsSinceEpoch] = normalized;
     }
 
     final normalized = unique.values.toList(growable: false)
       ..sort((a, b) => a.compareTo(b));
 
     return List<DateTime>.unmodifiable(normalized);
+  }
+
+  static String _normalizeNotificationSound(String? value) {
+    final raw = value?.trim();
+    if (raw == null || raw.isEmpty) return notificationSoundDefault;
+    if (supportedNotificationSounds.contains(raw)) return raw;
+    return notificationSoundDefault;
   }
 }

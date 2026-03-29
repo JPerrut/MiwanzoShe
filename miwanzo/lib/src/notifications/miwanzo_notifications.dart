@@ -13,18 +13,31 @@ class MiwanzoNotifications {
 
   static final MiwanzoNotifications instance = MiwanzoNotifications._();
 
-  static const String _channelId = 'miwanzo_important_dates';
-  static const String _channelName = 'Datas importantes';
+  static const String _defaultChannelId = 'miwanzo_important_dates_default';
+  static const String _defaultChannelName = 'Datas importantes';
+  static const String _customSoundChannelId =
+      'miwanzo_important_dates_miwanzo_tone';
+  static const String _customSoundChannelName =
+      'Datas importantes (som Miwanzo)';
   static const String _channelDescription =
       'Lembretes locais para datas importantes do Miwanzo.';
+  static const String _customSoundResourceName =
+      ImportantDate.notificationSoundMiwanzo;
   static const int _customRuleStartCode = 6;
   static const int _idBlockSize = 10000;
   static const int _maxCustomRules = _idBlockSize - _customRuleStartCode;
+  static final Int64List _defaultVibrationPattern = Int64List.fromList([
+    0,
+    260,
+    120,
+    260,
+  ]);
 
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
 
   bool _initialized = false;
+  AndroidScheduleMode _scheduleMode = AndroidScheduleMode.inexactAllowWhileIdle;
 
   bool get _isSupportedPlatform {
     if (kIsWeb) return false;
@@ -56,6 +69,21 @@ class MiwanzoNotifications {
         >();
 
     await androidPlugin?.requestNotificationsPermission();
+    try {
+      final supportsExact =
+          await androidPlugin?.canScheduleExactNotifications() ?? false;
+      if (supportsExact) {
+        _scheduleMode = AndroidScheduleMode.exactAllowWhileIdle;
+      } else {
+        final exactPermissionGranted =
+            await androidPlugin?.requestExactAlarmsPermission() ?? false;
+        _scheduleMode = exactPermissionGranted
+            ? AndroidScheduleMode.exactAllowWhileIdle
+            : AndroidScheduleMode.inexactAllowWhileIdle;
+      }
+    } catch (_) {
+      _scheduleMode = AndroidScheduleMode.inexactAllowWhileIdle;
+    }
 
     _initialized = true;
   }
@@ -78,26 +106,18 @@ class MiwanzoNotifications {
     await cancelForImportantDate(date.id);
 
     final rules = _buildRules(date);
+    final details = _detailsForDate(date);
 
     for (final rule in rules) {
       final nextTrigger = _computeNextTrigger(date, rule);
       if (nextTrigger == null) continue;
 
-      await _plugin.zonedSchedule(
-        _notificationId(date.id, rule.code),
-        rule.title,
-        rule.body,
-        nextTrigger,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            _channelId,
-            _channelName,
-            channelDescription: _channelDescription,
-            importance: Importance.max,
-            priority: Priority.high,
-          ),
-        ),
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      await _scheduleWithFallback(
+        notificationId: _notificationId(date.id, rule.code),
+        title: rule.title,
+        body: rule.body,
+        trigger: nextTrigger,
+        details: details,
         payload: 'important_date:${date.id}',
       );
     }
@@ -192,7 +212,7 @@ class MiwanzoNotifications {
       rules.add(
         _RuleNotification(
           code: _customRuleStartCode + index,
-          absoluteAt: customAt,
+          absoluteAt: customAt.isUtc ? customAt.toLocal() : customAt,
           title: 'Lembrete personalizado: $title',
           body: body,
         ),
@@ -288,6 +308,65 @@ class MiwanzoNotifications {
 
   int _notificationId(int importantDateId, int code) {
     return importantDateId * _idBlockSize + code;
+  }
+
+  NotificationDetails _detailsForDate(ImportantDate date) {
+    final usesCustomSound =
+        date.notificationSound == ImportantDate.notificationSoundMiwanzo;
+
+    return NotificationDetails(
+      android: AndroidNotificationDetails(
+        usesCustomSound ? _customSoundChannelId : _defaultChannelId,
+        usesCustomSound ? _customSoundChannelName : _defaultChannelName,
+        channelDescription: _channelDescription,
+        importance: Importance.max,
+        priority: Priority.high,
+        playSound: true,
+        sound: usesCustomSound
+            ? const RawResourceAndroidNotificationSound(
+                _customSoundResourceName,
+              )
+            : null,
+        enableVibration: true,
+        vibrationPattern: _defaultVibrationPattern,
+      ),
+    );
+  }
+
+  Future<void> _scheduleWithFallback({
+    required int notificationId,
+    required String title,
+    required String body,
+    required tz.TZDateTime trigger,
+    required NotificationDetails details,
+    required String payload,
+  }) async {
+    try {
+      await _plugin.zonedSchedule(
+        notificationId,
+        title,
+        body,
+        trigger,
+        details,
+        androidScheduleMode: _scheduleMode,
+        payload: payload,
+      );
+      return;
+    } catch (_) {
+      if (_scheduleMode != AndroidScheduleMode.exactAllowWhileIdle) {
+        rethrow;
+      }
+    }
+
+    await _plugin.zonedSchedule(
+      notificationId,
+      title,
+      body,
+      trigger,
+      details,
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      payload: payload,
+    );
   }
 }
 
